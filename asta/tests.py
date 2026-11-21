@@ -273,10 +273,13 @@ class GestioneAsteTest(Base):
         buf = io.BytesIO(); wb.save(buf)
         url = f"/asta/{self.asta.pk}/lotti/importa/"
         r = self.client.post(url, {"file": SimpleUploadedFile("lotti.xlsx", buf.getvalue())})
-        self.assertEqual((r.context["n_ok"], r.context["n_err"]), (2, 2))
+        # numero doppio: non caricabile; mandante sconosciuto: si carica lo stesso con una scheda da completare
+        self.assertEqual((r.context["n_ok"], r.context["n_err"], r.context["n_avvisi"]), (2, 1, 1))
         self.assertEqual(self.asta.lotti.count(), 1)  # niente salvato prima della conferma
         self.client.post(url, {"azione": "conferma"})
-        self.assertEqual(sorted(self.asta.lotti.values_list("numero", flat=True), key=int), ["1", "2", "20"])
+        self.assertEqual(sorted(self.asta.lotti.values_list("numero", flat=True), key=int), ["1", "2", "20", "21"])
+        nuovo = Lotto.objects.get(asta=self.asta, numero="21").mandato
+        self.assertEqual((nuovo.mandante.nome, nuovo.mandante.is_mandante), ("MXXX", True))
         self.assertEqual(Lotto.objects.get(asta=self.asta, numero="20").base_asta, D("1200"))
 
     def test_riproponi_invenduto(self):
@@ -427,7 +430,8 @@ class CatalogoFaldoneTest(TestCase):
         from django.core.files.uploadedfile import SimpleUploadedFile
         url = f"/asta/{self.asta.pk}/lotti/importa/"
         r = self.client.post(url, {"file": SimpleUploadedFile("Schede.docx", _catalogo_word())})
-        self.assertEqual((r.context["n_ok"], r.context["n_err"], r.context["n_esclusi"]), (2, 2, 1))
+        self.assertEqual((r.context["n_ok"], r.context["n_avvisi"], r.context["n_err"], r.context["n_esclusi"]),
+                         (2, 2, 0, 1))
         testi = [t for _, t, _, _ in r.context["da_abbinare"]]
         self.assertEqual(testi, ["", "SCONOSCIUTO"])
         r = self.client.post(url, {"azione": "conferma", "testo_mandante": testi,
@@ -438,6 +442,49 @@ class CatalogoFaldoneTest(TestCase):
                          (1, 2, self.m_ven, self.m_cov))
         self.assertEqual((lotti["2"].riserva, lotti["2"].stima_max, lotti["2"].titolo), (D("1300"), D("2500"),
                                                                                          "L’Astronave Atomica"))
+
+    def test_carica_anche_senza_abbinare(self):
+        """Quello che il programma non capisce si carica lo stesso e resta segnato «da verificare»."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        url = f"/asta/{self.asta.pk}/lotti/importa/"
+        self.client.post(url, {"file": SimpleUploadedFile("Schede.docx", _catalogo_word())})
+        self.client.post(url, {"azione": "conferma"})
+        lotti = {l.numero: l for l in self.asta.lotti.select_related("mandato__mandante")}
+        self.assertEqual(sorted(lotti, key=int), ["1", "2", "3", "4"])
+        self.assertEqual(lotti["4"].mandato.mandante.nome, "SCONOSCIUTO")
+        self.assertEqual(lotti["3"].mandato.mandante.nome, "MANDANTE DA ABBINARE")
+        self.assertTrue(lotti["3"].note_interne.startswith("DA VERIFICARE"))
+        self.assertFalse(lotti["4"].note_interne.startswith("DA VERIFICARE"))
+        r = self.client.get(f"/asta/{self.asta.pk}/lotti/?verifica=1")
+        self.assertEqual([l.numero for l in r.context["lotti"]], ["3"])
+
+    def test_varianti_catalogo(self):
+        """Varianti trovate nelle schede reali: punto attaccato, riserva «R.150», prezzo senza €, a capo, tornate."""
+        import io
+
+        import docx
+
+        from .import_word import leggi_catalogo_word
+        d = docx.Document()
+        d.add_paragraph().add_run("FUMETTI").bold = True
+        d.add_paragraph().add_run("3.Pinocchio").bold = True
+        d.add_paragraph("Foglio sciolto.\n€175/400 BRUNI R.150")
+        d.add_paragraph("FINE PRIMA TORNATA")
+        d.add_paragraph().add_run("10. HUGO PRATT").bold = True
+        d.add_paragraph().add_run("Corto Maltese").bold = True
+        d.add_paragraph("1991. Raccolta di litografie.")
+        d.add_paragraph("La coppia € 150/350 R. 250 ALFA MANCA FOTO")
+        d.add_paragraph().add_run("00. Senza numero").bold = True
+        d.add_paragraph("150/300 BRUNI")
+        buf = io.BytesIO(); d.save(buf)
+        a, b, c = leggi_catalogo_word(buf.getvalue(), self.asta, 1)
+        self.assertEqual((a["numero"], a["titolo"], a["base"], a["stima"], a["riserva"], a["mandato_id"], a["tornata"]),
+                         ("3", "Pinocchio", "175", "400", "150", self.m_cov.pk, None))
+        self.assertEqual((b["numero"], b["illustratore"], b["titolo"], b["riserva"], b["mandato_id"], b["tornata"]),
+                         ("10", "HUGO PRATT", "Corto Maltese", "250", self.m_ven.pk, 2))
+        self.assertIn("1991. Raccolta", b["descrizione"])
+        self.assertTrue(b["da_fotografare"])
+        self.assertEqual((c["numero"], c["base"], c["mandato_id"]), ("11", "150", self.m_cov.pk))
 
     def test_faldone(self):
         import io

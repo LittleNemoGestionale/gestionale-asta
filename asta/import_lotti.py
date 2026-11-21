@@ -123,6 +123,7 @@ def leggi_word(contenuto: bytes, asta) -> list[dict]:
     for l in leggi_catalogo_word(contenuto, asta, prossimo_numero(asta)):
         out.append(_riga_vuota(
             numero=l["numero"], titolo=l["titolo"], descrizione=l["descrizione"], sezione=l["sezione"],
+            tornata=l.get("tornata"), illustratore=l.get("illustratore", ""),
             mandato_id=l["mandato_id"], mandato=l["mandato"], mandante_testo=l["mandante_testo"],
             note_interne=l["note_interne"], da_fotografare=l["da_fotografare"], escluso=l["escluso"],
             avvisi=[a for a in l["avvisi"] if "mandante" not in a and "mandato" not in a],
@@ -152,6 +153,11 @@ def controlla(righe: list[dict], asta, abbinamenti: dict[str, int] | None = None
         if r["escluso"]:
             continue
         chiave = r["mandante_testo"] or ""
+        if chiave not in abbinamenti:  # «ROSSI MANCA FOTO» usa l'abbinamento di «ROSSI»
+            prefisso = next((k for k in sorted(abbinamenti, key=len, reverse=True)
+                             if k and abbinamenti[k] and chiave.startswith(k + " ")), None)
+            if prefisso:
+                chiave = prefisso
         if chiave in abbinamenti and abbinamenti[chiave]:
             m = mandati.get(abbinamenti[chiave])
             if m:
@@ -174,15 +180,70 @@ def controlla(righe: list[dict], asta, abbinamenti: dict[str, int] | None = None
     return righe
 
 
-def salva(righe: list[dict], asta) -> int:
-    n = 0
+MANDANTE_SCONOSCIUTO = "MANDANTE DA ABBINARE"
+ERRORI_NON_BLOCCANTI = ("mandante da abbinare", "mandante mancante")
+
+
+def bloccante(r) -> bool:
+    """Solo i numeri doppi o le righe vuote impediscono il caricamento; il resto si carica e si segnala."""
+    return any(not e.startswith(ERRORI_NON_BLOCCANTI) for e in r["errori"])
+
+
+def mandato_provvisorio(testo: str, asta, creati: dict):
+    """Scheda mandante creata dal catalogo (da completare) con un mandato provvisorio."""
+    from django.utils import timezone
+
+    from .models import Soggetto
+    testo = (testo or "").strip() or MANDANTE_SCONOSCIUTO
+    if testo in creati:
+        return creati[testo]
+    sogg = Riconoscitore().trova(testo) if testo != MANDANTE_SCONOSCIUTO else None
+    if sogg is None and testo == MANDANTE_SCONOSCIUTO:
+        sogg = next((x for x in Soggetto.objects.filter(is_mandante=True) if x.nome == testo), None)
+    if sogg is None:
+        sogg = Soggetto.objects.create(
+            tipo="azienda", ragione_sociale=testo, is_mandante=True,
+            note=f"Scheda creata dal caricamento del catalogo dell'asta {asta.numero or asta.nome}: "
+                 "completare i dati e verificare la percentuale del mandato.")
+    m = Riconoscitore.mandato_di(sogg, asta)
+    if m is None:
+        anno = timezone.localdate().year
+        n = Mandato.objects.filter(numero__startswith=f"{anno}/").count() + 1
+        while Mandato.objects.filter(numero=f"{anno}/{n:03d}").exists():
+            n += 1
+        m = Mandato.objects.create(mandante=sogg, numero=f"{anno}/{n:03d}", data=timezone.localdate(),
+                                   commissione_pct=asta.diritti_pct,
+                                   note_accordo="DA VERIFICARE: mandato creato dal caricamento del catalogo.")
+    creati[testo] = m
+    return m
+
+
+def salva(righe: list[dict], asta) -> dict:
+    """Carica tutto ciò che si può; restituisce il riepilogo di cosa va controllato."""
+    esito = {"caricati": 0, "da_verificare": [], "non_caricati": [], "mandanti_creati": {}}
+    creati = {}
     for r in righe:
-        if r["escluso"] or r["errori"]:
+        if r["escluso"]:
             continue
+        if bloccante(r):
+            esito["non_caricati"].append(f"{r['numero'] or '?'} {r['titolo'][:40]}: {'; '.join(r['errori'])}")
+            continue
+        note = r["note_interne"]
+        # il mandante scritto a parole diventa una scheda (segnalata a parte): il lotto in sé è a posto
+        problemi = [e for e in r["errori"] if not e.startswith("mandante da abbinare")] + list(r.get("avvisi", []))
+        mandato_id = r["mandato_id"]
+        if not mandato_id:
+            m = mandato_provvisorio(r["mandante_testo"], asta, creati)
+            mandato_id = m.pk
+            esito["mandanti_creati"].setdefault(m.mandante.nome, 0)
+            esito["mandanti_creati"][m.mandante.nome] += 1
+        if problemi:
+            note = f"DA VERIFICARE: {'; '.join(problemi)}. {note}".strip()
+            esito["da_verificare"].append(r["numero"])
         Lotto.objects.create(
             asta=asta, numero=r["numero"], tornata=r["tornata"] or 1, sezione=r["sezione"][:150],
             titolo=r["titolo"][:250], illustratore=r["illustratore"][:200], descrizione=r["descrizione"],
-            note_interne=r["note_interne"][:250], da_fotografare=r["da_fotografare"], mandato_id=r["mandato_id"],
+            note_interne=note[:250], da_fotografare=r["da_fotografare"], mandato_id=mandato_id,
             **{k: (Decimal(v) if v is not None else None) for k, v in r["valori"].items()})
-        n += 1
-    return n
+        esito["caricati"] += 1
+    return esito

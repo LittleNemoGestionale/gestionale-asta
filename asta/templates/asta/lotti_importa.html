@@ -34,13 +34,14 @@
 
 {% else %}
 <p>File <b>{{ dati.file }}</b> ·
-  <b>{{ n_ok }}</b> lotti pronti{% if n_err %} · <span class="warn">{{ n_err }} da sistemare</span>{% endif %}{% if n_esclusi %} · <span class="muted">{{ n_esclusi }} esclusi (sezioni «da inserire / prossime aste»)</span>{% endif %}{% if n_foto %} · <span class="foto">{{ n_foto }} da fotografare</span>{% endif %}
+  <b>{{ n_ok|add:n_avvisi }}</b> lotti da caricare{% if n_avvisi %} (di cui <span class="warn">{{ n_avvisi }} con mandante da abbinare</span>: si caricano lo stesso e restano segnati «da verificare»){% endif %}{% if n_err %} · <span class="warn">{{ n_err }} non caricabili</span> (numero doppio o riga vuota){% endif %}{% if n_esclusi %} · <span class="muted">{{ n_esclusi }} esclusi (sezioni «da inserire / prossime aste»)</span>{% endif %}{% if n_foto %} · <span class="foto">{{ n_foto }} da fotografare</span>{% endif %}
   · <a href="?nuovo=1">carica un altro file</a></p>
 
 <form method="post">{% csrf_token %}
   {% if da_abbinare %}
   <h2>1. Abbina i mandanti</h2>
-  <p class="muted">Nel catalogo i mandanti sono scritti a parole. Scegli per ognuno il mandato corrispondente (una volta sola per tutti i suoi lotti).</p>
+  <p class="muted">Nel catalogo i mandanti sono scritti a parole. Scegli per ognuno il mandato corrispondente (una volta sola per tutti i suoi lotti).
+    Se lasci «— scegli —» il programma <b>crea da solo la scheda del mandante</b> con quel nome (da completare dopo) e carica comunque i lotti.</p>
   <div class="box abbina">
     {% for i, testo, scelto, n in da_abbinare %}
       <input type="hidden" name="testo_mandante" value="{{ testo }}">
@@ -61,7 +62,7 @@
   {% endif %}
 
   <div class="azioni"><button class="btn sec" name="azione" value="aggiorna">Aggiorna l'anteprima</button>
-    <button class="btn" name="azione" value="conferma" {% if not n_ok %}disabled{% endif %}>Carica {{ n_ok }} lotti</button></div>
+    <button class="btn" name="azione" value="conferma" {% if not n_ok and not n_avvisi %}disabled{% endif %}>Carica {{ n_ok|add:n_avvisi }} lotti</button></div>
 
   <h2>Anteprima</h2>
   <div class="scroll"><table>
@@ -83,7 +84,7 @@
     </tbody>
   </table></div>
   <div class="azioni"><button class="btn sec" name="azione" value="aggiorna">Aggiorna l'anteprima</button>
-    <button class="btn" name="azione" value="conferma" {% if not n_ok %}disabled{% endif %}>Carica {{ n_ok }} lotti</button></div>
+    <button class="btn" name="azione" value="conferma" {% if not n_ok and not n_avvisi %}disabled{% endif %}>Carica {{ n_ok|add:n_avvisi }} lotti</button></div>
 </form>
 {% endif %}
 {% endblock %}

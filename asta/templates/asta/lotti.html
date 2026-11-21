@@ -32,7 +32,7 @@
 {% endif %}
 
 <div class="azioni" style="justify-content:space-between"><h2 style="margin:0">Catalogo</h2>
-  <span>{% if n_foto %}{% if solo_foto %}<a href="?">Mostra tutti</a>{% else %}<a href="?foto=1">{{ n_foto }} da fotografare</a>{% endif %}{% endif %}
+  <span>{% if n_verifica %}{% if solo_verifica %}<a href="?">Mostra tutti</a>{% else %}<a href="?verifica=1" class="warn">{{ n_verifica }} da verificare</a>{% endif %} · {% endif %}{% if n_foto %}{% if solo_foto %}<a href="?">Mostra tutti</a>{% else %}<a href="?foto=1">{{ n_foto }} da fotografare</a>{% endif %}{% endif %}
   {% if not puo or asta.chiusa %} · <a href="{% url 'faldone' asta.pk %}">Scarica il faldone</a>{% endif %}</span></div>
 <div class="scroll"><table>
   <thead><tr><th>Lotto</th>{% if asta.numero_tornate > 1 %}<th>Tornata</th>{% endif %}<th>Descrizione</th><th>Mandante</th><th class="n">Base</th><th class="n">Stima</th><th class="n">Riserva</th><th class="n">Comm.</th><th>Stato</th><th></th></tr></thead>

@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponse
+from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -209,12 +210,16 @@ def lotti_asta(request, asta_id):
                 return redirect("lotti_asta", asta.pk)
     lotti = asta.lotti.select_related("mandato__mandante", "lotto_origine__asta").order_by("ordine", "numero")
     n_foto = lotti.filter(da_fotografare=True).count()
+    n_verifica = lotti.filter(note_interne__startswith="DA VERIFICARE").count()
     if request.GET.get("foto"):
         lotti = lotti.filter(da_fotografare=True)
+    if request.GET.get("verifica"):
+        lotti = lotti.filter(note_interne__startswith="DA VERIFICARE")
     mandati = Mandato.objects.select_related("mandante").order_by("mandante__codice", "-data")
     return render(request, "asta/lotti.html", {"asta": asta, "lotti": lotti, "form": form, "puo": puo,
-                                               "mandati": mandati, "n_foto": n_foto,
-                                               "solo_foto": bool(request.GET.get("foto"))})
+                                               "mandati": mandati, "n_foto": n_foto, "n_verifica": n_verifica,
+                                               "solo_foto": bool(request.GET.get("foto")),
+                                               "solo_verifica": bool(request.GET.get("verifica"))})
 
 
 # ------------------------------------------------------------------ import da file (Word / Excel)
@@ -251,12 +256,20 @@ def importa_lotti(request, asta_id):
         request.session[chiave] = json.dumps(dati)
         if request.POST.get("azione") == "conferma":
             with transaction.atomic():
-                n = imp.salva(dati["righe"], asta)
-            scartati = sum(1 for r in dati["righe"] if not r["escluso"] and r["errori"])
+                esito = imp.salva(dati["righe"], asta)
             request.session.pop(chiave, None)
-            messages.success(request, f"{n} lotti caricati." + (f" {scartati} lotti con problemi non caricati: "
-                                                                 "si possono aggiungere a mano." if scartati else ""))
-            return redirect("lotti_asta", asta.pk)
+            messages.success(request, f"{esito['caricati']} lotti caricati.")
+            if esito["mandanti_creati"]:
+                elenco = ", ".join(f"{k} ({v} lotti)" for k, v in sorted(esito["mandanti_creati"].items()))
+                messages.info(request, "Mandanti non trovati in anagrafica: ho creato le schede da completare "
+                                       f"(dati e percentuale del mandato): {elenco}.")
+            if esito["da_verificare"]:
+                messages.info(request, f"{len(esito['da_verificare'])} lotti da verificare (mandante, prezzo…): "
+                                       "li trovi con il filtro «Da verificare».")
+            if esito["non_caricati"]:
+                messages.error(request, "Non caricati (aggiungili a mano): " + " · ".join(esito["non_caricati"]))
+            return redirect(f"{reverse('lotti_asta', args=[asta.pk])}?verifica=1"
+                            if esito["da_verificare"] else reverse("lotti_asta", args=[asta.pk]))
     elif request.method == "GET" and request.GET.get("nuovo"):
         request.session.pop(chiave, None)
         dati = None
@@ -269,7 +282,8 @@ def importa_lotti(request, asta_id):
         ctx.update({
             "righe": righe,
             "n_ok": sum(1 for r in righe if not r["escluso"] and not r["errori"]),
-            "n_err": sum(1 for r in righe if not r["escluso"] and r["errori"]),
+            "n_err": sum(1 for r in righe if not r["escluso"] and imp.bloccante(r)),
+            "n_avvisi": sum(1 for r in righe if not r["escluso"] and r["errori"] and not imp.bloccante(r)),
             "n_esclusi": sum(1 for r in righe if r["escluso"]),
             "n_foto": sum(1 for r in righe if r["da_fotografare"] and not r["escluso"]),
             "da_abbinare": [(i, t, dati["abbinamenti"].get(t), sum(1 for r in righe if r["mandante_testo"] == t and not r["escluso"]))
