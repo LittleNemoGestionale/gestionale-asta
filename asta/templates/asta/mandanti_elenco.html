@@ -1,0 +1,24 @@
+{% extends "asta/base.html" %}
+{% block title %}Mandanti{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<div class="azioni" style="justify-content:space-between"><h1 style="margin:0">Mandanti</h1>
+  <span>{% if perms.asta.add_soggetto %}<a class="btn" href="{% url 'scheda_nuova' %}?ruolo=mandante">+ Nuovo mandante</a>{% endif %}
+  <a class="btn sec" href="{% url 'mandati' %}">Mandati</a></span></div>
+<p class="muted">Chi vi affida materiale da vendere. La scheda è la stessa dell'anagrafica: se il mandante compra anche, basta spuntare «cliente».
+  {% if n_da_completare %}<b>{{ n_da_completare }}</b> schede create in automatico (dal catalogo o da Excel) sono da completare.{% endif %}</p>
+<form class="filtri" method="get"><input name="q" value="{{ q }}" placeholder="Cerca nome, codice o città" autofocus> <button class="btn sec">Cerca</button>{% if q %} <a href="?">Mostra tutti</a>{% endif %}</form>
+<div class="scroll"><table>
+  <thead><tr><th>Codice</th><th>Mandante</th><th>Città</th><th class="n">Mandati</th><th class="n">Oggetti</th><th></th></tr></thead>
+  <tbody>{% for x in mandanti %}<tr>
+    <td>{{ x.codice }}</td>
+    <td><a href="{% url 'scheda' x.pk %}"><b>{{ x.nome|default:"(senza nome)" }}</b></a>{% if "completare" in x.note %} <span class="pill mid">da completare</span>{% endif %}</td>
+    <td>{{ x.domicilio.citta|default:"" }}</td>
+    <td class="n">{% if x.n_mandati %}<a href="{% url 'mandati' %}?q={{ x.codice }}">{{ x.n_mandati }}</a>{% else %}0{% endif %}</td>
+    <td class="n">{{ x.n_oggetti }}</td>
+    <td>{% if perms.asta.add_mandato %}<a href="{% url 'nuovo_mandato' x.pk %}">+ mandato</a>{% endif %}</td>
+  </tr>{% empty %}<tr><td colspan="6" class="muted">Nessun mandante{% if q %} trovato{% endif %}.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% if totale > 300 %}<p class="muted">Mostrati 300 su {{ totale }}: usa la ricerca.</p>{% endif %}
+<style>.filtri{display:flex;gap:8px;margin:10px 0}.filtri input{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;min-width:260px}</style>
+{% endblock %}

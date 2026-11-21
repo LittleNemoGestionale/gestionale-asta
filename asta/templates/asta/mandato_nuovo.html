@@ -26,7 +26,7 @@
     {% if mandanti or not s %}<div style="grid-column:1/-1"><label>Mandante</label>
       <select name="mandante" required style="width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px"><option value="">— scegli —</option>
         {% for x in mandanti %}<option value="{{ x.pk }}" {% if s and s.pk == x.pk %}selected{% endif %}>{{ x.nome }} ({{ x.codice }})</option>{% endfor %}</select>
-      <div class="muted" style="font-size:12px">Non c'è? <a href="{% url 'scheda_nuova' %}?ruolo=mandante" target="_blank">Crea la scheda</a> (si apre in un'altra finestra), poi ricarica questa pagina.</div></div>{% endif %}
+      <div class="muted" style="font-size:12px">Non c'è? <a href="{% url 'scheda_nuova' %}?ruolo=mandante&ritorno={{ request.path|urlencode }}{% if asta_di %}%3Fasta%3D{{ asta_di.pk }}{% endif %}">Registra il nuovo mandante</a>: dopo il salvataggio torni qui con il mandante già scelto.</div></div>{% endif %}
     {% for f in form %}<div {% if f.name == 'note_accordo' %}style="grid-column:1/-1"{% endif %}>
       {% if f.field.widget.input_type == 'checkbox' %}<label>{{ f }} {{ f.label }}</label>{% else %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% endif %}{{ f.errors }}</div>{% endfor %}
   </div>

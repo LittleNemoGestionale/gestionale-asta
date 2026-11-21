@@ -1149,3 +1149,17 @@ class MandatoDaAstaTest(TestCase):
                                              "torna": f"/asta/{asta.pk}/lotti/"})
         self.assertRedirects(r, f"/asta/{asta.pk}/lotti/")
         self.assertEqual(sorted(asta.lotti.values_list("riserva", flat=True)), [D("70"), D("80")])
+
+
+class SezioneMandantiTest(TestCase):
+    def test_elenco_e_ritorno_al_mandato(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        Soggetto.objects.create(nome_proprio="Anna", cognome="Verdi", is_cliente=True)
+        r = self.client.get("/mandanti/")
+        self.assertEqual([x.nome for x in r.context["mandanti"]], ["Bruni Mario"])
+        nuovo = Soggetto.objects.create(nome_proprio="Luca", cognome="Neri", is_mandante=True)
+        r = self.client.get(f"/mandati/nuovo/?asta=&cliente={nuovo.pk}")
+        self.assertEqual(r.context["s"], nuovo)
+        self.assertContains(r, "Registra il nuovo mandante")

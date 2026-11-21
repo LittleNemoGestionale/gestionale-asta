@@ -196,6 +196,22 @@ def ctx_barra():
 # ------------------------------------------------------------------ pagine
 
 @login_required
+@permission_required("asta.view_dati_personali", raise_exception=True)
+def mandanti(request):
+    """Elenco dei mandanti (le schede di chi affida materiale), con i loro mandati."""
+    q = request.GET.get("q", "").strip().lower()
+    qs = (Soggetto.objects.filter(is_mandante=True).prefetch_related("indirizzi")
+          .annotate(n_mandati=Count("mandati", distinct=True), n_oggetti=Count("mandati__oggetti", distinct=True)))
+    elenco = sorted(qs, key=lambda x: (x.nome or "").lower())
+    if q:
+        elenco = [x for x in elenco if q in (x.nome or "").lower() or q == x.codice.lower()
+                  or any(q in (i.citta or "").lower() for i in x.indirizzi.all())]
+    da_completare = [x for x in elenco if "completare" in (x.note or "")]
+    return render(request, "asta/mandanti_elenco.html", {"mandanti": elenco[:300], "totale": len(elenco), "q": q,
+                                                         "n_da_completare": len(da_completare)})
+
+
+@login_required
 @permission_required("asta.view_mandato", raise_exception=True)
 def mandati(request):
     f = {k: request.GET.get(k, "") for k in ("q", "arrivo", "dest", "asta")}
@@ -250,6 +266,8 @@ class MandatoForm(forms.ModelForm):
 @permission_required("asta.add_mandato", raise_exception=True)
 def mandato_nuovo(request, soggetto_id=None):
     s = get_object_or_404(Soggetto, pk=soggetto_id) if soggetto_id else None
+    if not s and request.GET.get("cliente"):  # di ritorno da «Nuovo mandante»
+        s = Soggetto.objects.filter(pk=request.GET["cliente"]).first()
     if not s and request.POST.get("mandante"):
         s = Soggetto.objects.filter(pk=request.POST["mandante"]).first()
     asta = Asta.objects.filter(pk=request.GET.get("asta") or 0).first()
