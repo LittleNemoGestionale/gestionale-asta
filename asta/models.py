@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Sum
+from django.utils import timezone
 
 from .crypto import EncryptedTextField, blind_index
 
@@ -610,12 +611,55 @@ class Lotto(models.Model):
         """Titolo del lotto se c'è (catalogo da Word), altrimenti la descrizione."""
         return self.titolo or self.descrizione
 
+    def registro_banditore(self) -> list[str]:
+        """Offerte scritte (dalla più alta) e telefoni, in forma corta: «201: 150», «TEL 301»."""
+        offerte = sorted(self.offerte_scritte.all(), key=lambda o: (-o.importo, o.ricevuta_il))
+        return ([f"{o.paletta.numero}: {o.importo:,.0f}".replace(",", ".") for o in offerte]
+                + [f"TEL {t.paletta.numero}" for t in self.telefonate.all()])
+
     @property
     def commissione_effettiva(self) -> Decimal:
         return self.commissione_pct if self.commissione_pct is not None else self.mandato.commissione_pct
 
     def __str__(self):
         return f"Lotto {self.numero}"
+
+
+class OffertaScritta(models.Model):
+    """Offerta massima lasciata prima dell'asta (palette 200–299, ma vale qualsiasi paletta dell'asta)."""
+
+    lotto = models.ForeignKey(Lotto, on_delete=models.CASCADE, related_name="offerte_scritte")
+    paletta = models.ForeignKey(Paletta, on_delete=models.CASCADE, related_name="offerte_scritte")
+    importo = models.DecimalField("offerta massima €", max_digits=12, decimal_places=2)
+    note = models.CharField(max_length=200, blank=True)
+    ricevuta_il = models.DateTimeField(default=timezone.now, help_text="a parità di importo vince la prima ricevuta")
+
+    class Meta:
+        verbose_name = "offerta scritta"
+        verbose_name_plural = "offerte scritte"
+        ordering = ["lotto__ordine", "-importo", "ricevuta_il"]
+        constraints = [models.UniqueConstraint(fields=["lotto", "paletta"], name="offerta_unica_per_lotto")]
+
+    def __str__(self):
+        return f"Lotto {self.lotto.numero}: paletta {self.paletta.numero} fino a {self.importo}"
+
+
+class Telefonata(models.Model):
+    """Partecipante al telefono su un lotto (palette 300–399) e il telefonista che lo chiama."""
+
+    lotto = models.ForeignKey(Lotto, on_delete=models.CASCADE, related_name="telefonate")
+    paletta = models.ForeignKey(Paletta, on_delete=models.CASCADE, related_name="telefonate")
+    telefonista = models.CharField(max_length=80, blank=True)
+    note = models.CharField(max_length=200, blank=True, help_text="es. lingua, orario, offerta di sicurezza")
+    creata_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name_plural = "telefonate"
+        ordering = ["lotto__ordine", "paletta__numero"]
+        constraints = [models.UniqueConstraint(fields=["lotto", "paletta"], name="telefonata_unica_per_lotto")]
+
+    def __str__(self):
+        return f"Lotto {self.lotto.numero}: telefono paletta {self.paletta.numero}"
 
 
 class Aggiudicazione(models.Model):

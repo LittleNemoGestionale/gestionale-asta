@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import (Aggiudicazione, Asta, Incasso, Indirizzo, Lotto, Mandato, MetodoPagamento, Oggetto,
+from .models import (Aggiudicazione, Asta, Incasso, Indirizzo, Lotto, Mandato, MetodoPagamento, Oggetto, OffertaScritta, Telefonata,
                      PagamentoMandante, Paletta, Soggetto, SpesaMandante)
 
 admin.site.site_header = "Gestionale Asta"
@@ -239,3 +239,15 @@ class PagamentoMandanteAdmin(admin.ModelAdmin):
         if "_addanother" not in request.POST and "_continue" not in request.POST:
             return redirect("pagamenti_mandanti", obj.asta_id)
         return super().response_add(request, obj, post_url_continue)
+
+
+@admin.register(OffertaScritta)
+class OffertaScrittaAdmin(admin.ModelAdmin):
+    list_display = ("lotto", "paletta", "importo", "ricevuta_il")
+    raw_id_fields = ("lotto", "paletta")
+
+
+@admin.register(Telefonata)
+class TelefonataAdmin(admin.ModelAdmin):
+    list_display = ("lotto", "paletta", "telefonista")
+    raw_id_fields = ("lotto", "paletta")

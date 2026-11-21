@@ -59,7 +59,7 @@
   {% if perms.asta.view_mandato %}<a href="{% url 'mandati' %}">Mandati</a><a href="{% url 'magazzino' %}">Magazzino</a>{% endif %}
   {% if perms.asta.view_paletta %}<a href="{% url 'palette' %}{% if asta and asta.pk %}?asta={{ asta.pk }}{% endif %}">Palette</a>{% endif %}
   <a href="{% url 'aste' %}">Aste</a>
-  {% if asta and asta.pk %}<span style="opacity:.6">|</span> <b style="font-weight:600">{% if asta.numero %}Asta {{ asta.numero }}{% else %}{{ asta.nome|truncatechars:20 }}{% endif %}</b><a href="{% url 'asta_cruscotto' asta.pk %}">Riepilogo</a><a href="{% url 'lotti_asta' asta.pk %}">Lotti</a><a href="{% url 'sala' asta.pk %}">Aggiudicazione</a>
+  {% if asta and asta.pk %}<span style="opacity:.6">|</span> <b style="font-weight:600">{% if asta.numero %}Asta {{ asta.numero }}{% else %}{{ asta.nome|truncatechars:20 }}{% endif %}</b><a href="{% url 'asta_cruscotto' asta.pk %}">Riepilogo</a><a href="{% url 'lotti_asta' asta.pk %}">Lotti</a>{% if perms.asta.view_paletta %}<a href="{% url 'offerte_telefoni' asta.pk %}">Offerte e telefoni</a>{% endif %}<a href="{% url 'sala' asta.pk %}">Aggiudicazione</a>
     {% if perms.asta.view_dati_personali %}<a href="{% url 'acquirenti' asta.pk %}">Acquirenti</a><a href="{% url 'mandanti' asta.pk %}">Mandanti</a>{% endif %}
     {% if perms.asta.view_incasso %}<a href="{% url 'incassi' asta.pk %}">Incassi</a>{% endif %}
 {% endif %}

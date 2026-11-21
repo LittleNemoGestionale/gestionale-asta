@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -119,7 +120,8 @@ def sala(request, asta_id):
     if tornata not in tornate_lotti:  # parte dalla prima tornata con lotti ancora da battere
         da_battere = asta.lotti.filter(stato=Lotto.Stato.IN_ASTA).order_by("ordine").values_list("tornata", flat=True).first()
         tornata = da_battere or tornate_lotti[0]
-    lotti = list(asta.lotti.filter(tornata__in=[tornata] + ([None] if tornata == 1 else []))
+    lotti = list(asta.lotti.prefetch_related("offerte_scritte__paletta", "telefonate__paletta")
+                 .filter(Q(tornata=tornata) | (Q(tornata__isnull=True) if tornata == 1 else Q(pk__in=[])))
                  .exclude(stato=Lotto.Stato.RIPROPOSTO)
                  .select_related("aggiudicazione__paletta").order_by("ordine", "numero"))
     venduti = [l for l in lotti if hasattr(l, "aggiudicazione")]

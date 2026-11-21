@@ -1032,3 +1032,54 @@ class AllegatiMandatoTest(TestCase):
         self.client.post(f"/mandati/{self.m.pk}/", {"azione": "togli_allegato", "allegato": a.pk})
         self.assertFalse(Allegato.objects.exists())
         self.assertFalse((Allegato.cartella() / a.file).exists())
+
+
+class OfferteTelefoniTest(TestCase):
+    def setUp(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        self.asta = Asta.objects.create(numero=95, nome="Fumetti", data=date(2099, 1, 1))
+        mand = Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        m = Mandato.objects.create(mandante=mand, numero="2099/001", data=date.today(), commissione_pct=15)
+        for n, base in (("12", 100), ("13", 50), ("40", 200), ("41", 200), ("42", 200)):
+            Lotto.objects.create(asta=self.asta, numero=n, mandato=m, titolo=f"Lotto {n}", base_asta=base)
+        a = Soggetto.objects.create(nome_proprio="Anna", cognome="Verdi", is_cliente=True, telefono="333 0000000")
+        b = Soggetto.objects.create(nome_proprio="Luca", cognome="Neri", is_cliente=True)
+        self.p201 = Paletta.objects.create(asta=self.asta, numero=201, acquirente=a)
+        self.p202 = Paletta.objects.create(asta=self.asta, numero=202, acquirente=b)
+        c = Soggetto.objects.create(nome_proprio="Sara", cognome="Gialli", is_cliente=True)
+        self.p301 = Paletta.objects.create(asta=self.asta, numero=301, acquirente=c)
+        self.url = f"/asta/{self.asta.pk}/offerte/"
+
+    def test_registro(self):
+        from .models import OffertaScritta, Telefonata
+        self.client.post(self.url, {"azione": "offerte", "paletta": "201", "testo": "12 150\n13: 40\n99 10\n40 1.500,00 €"})
+        self.client.post(self.url, {"azione": "offerte", "paletta": "202", "testo": "12 150"})
+        self.assertEqual(OffertaScritta.objects.count(), 4)
+        self.assertEqual(OffertaScritta.objects.get(paletta=self.p201, lotto__numero="40").importo, D("1500"))
+        self.client.post(self.url, {"azione": "offerte", "paletta": "201", "testo": "12 180"})  # correzione
+        self.assertEqual(OffertaScritta.objects.get(paletta=self.p201, lotto__numero="12").importo, D("180"))
+        self.client.post(self.url, {"azione": "telefoni", "paletta": "301", "lotti": "40-42, 13", "telefonista": "Giulia"})
+        self.assertEqual(sorted(Telefonata.objects.values_list("lotto__numero", flat=True)), ["13", "40", "41", "42"])
+        r = self.client.post(self.url, {"azione": "offerte", "paletta": "250", "testo": "12 100"}, follow=True)
+        self.assertContains(r, "non è assegnata")
+        r = self.client.get(self.url)
+        riga = next(x for x in r.context["righe"] if x["lotto"].numero == "12")
+        self.assertEqual([o.paletta.numero for o in riga["offerte"]], [201, 202])
+        r = self.client.get(self.url + "?vista=telefonisti")
+        self.assertContains(r, "Giulia")
+        lotto = Lotto.objects.get(asta=self.asta, numero="13")
+        self.assertEqual(lotto.registro_banditore(), ["201: 40", "TEL 301"])
+        r = self.client.get(f"/asta/{self.asta.pk}/sala/")
+        self.assertContains(r, "201: 180 · 202: 150")
+
+    def test_faldone_colonne_off(self):
+        import io
+
+        from openpyxl import load_workbook
+        self.client.post(self.url, {"azione": "offerte", "paletta": "201", "testo": "12 150"})
+        self.client.post(self.url, {"azione": "telefoni", "paletta": "301", "lotti": "12"})
+        r = self.client.get(f"/asta/{self.asta.pk}/faldone/")
+        ws = load_workbook(io.BytesIO(r.content))["SERGIO"]
+        riga = next(row for row in ws.iter_rows(values_only=True) if row[0] == 12)
+        self.assertEqual(riga[5:8], ("201: 150", "TEL 301", None))

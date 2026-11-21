@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 
-from asta import views, views_aggiorna, views_mandati, views_acquirenti, views_mandanti, views_anagrafica, views_aste, views_sala
+from asta import views, views_aggiorna, views_mandati, views_offerte, views_acquirenti, views_mandanti, views_anagrafica, views_aste, views_sala
 
 urlpatterns = [
     path("", views_anagrafica.home, name="home"),
@@ -33,6 +33,7 @@ urlpatterns = [
     path("asta/<int:asta_id>/incassi/", views.incassi, name="incassi"),
     path("asta/<int:asta_id>/pagamenti-mandanti/", views.pagamenti_mandanti, name="pagamenti_mandanti"),
     path("asta/<int:asta_id>/excel/<str:quale>/", views.excel_contabilita, name="excel_contabilita"),
+    path("asta/<int:asta_id>/offerte/", views_offerte.offerte_telefoni, name="offerte_telefoni"),
     path("asta/<int:asta_id>/sala/", views_sala.sala, name="sala"),
     path("asta/<int:asta_id>/post-asta/", views_sala.post_asta, name="post_asta"),
     path("asta/<int:asta_id>/acquirenti/", views_acquirenti.acquirenti, name="acquirenti"),

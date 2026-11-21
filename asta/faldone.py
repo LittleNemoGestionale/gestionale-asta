@@ -85,7 +85,8 @@ def foglio_battitore(ws, lotti, orari, con_cambi=True):
         tornata = l.tornata or 1
         n, bis = _numero_e_bis(l.numero)
         ws.append([f"{n}{bis}" if bis else n, l.titolo or l.descrizione[:80], l.descrizione_breve or l.illustratore or None,
-                   l.base_asta, l.riserva if l.riserva not in (None, l.base_asta) else None] + [None] * 8)
+                   l.base_asta, l.riserva if l.riserva not in (None, l.base_asta) else None]
+                  + (l.registro_banditore() + [None] * 6)[:6] + [None] * 2)
         r = ws.max_row
         for c in ws[r]:
             c.font, c.border, c.alignment = Font(size=14, bold=c.column == 1), BORDO, A_CAPO
@@ -102,7 +103,8 @@ def foglio_battitore(ws, lotti, orari, con_cambi=True):
 
 def crea_faldone(asta) -> bytes:
     lotti = list(Lotto.objects.filter(asta=asta).exclude(stato=Lotto.Stato.RIPROPOSTO)
-                 .select_related("mandato__mandante", "aggiudicazione__paletta").order_by("ordine", "numero"))
+                 .select_related("mandato__mandante", "aggiudicazione__paletta")
+                 .prefetch_related("offerte_scritte__paletta", "telefonate__paletta").order_by("ordine", "numero"))
     orari = _orari(asta)
     wb = Workbook()
 

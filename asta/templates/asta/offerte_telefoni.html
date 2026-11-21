@@ -1,0 +1,94 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Offerte scritte e telefoni · Asta {{ asta.numero }}{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }} noprint">{{ m }}</div>{% endfor %}
+<div class="azioni" style="justify-content:space-between"><div><h1 style="margin:0">Offerte scritte e telefoni · Asta {{ asta.numero }}</h1>
+  <span class="muted">{{ n_offerte }} offerte scritte · {{ n_telefonate }} lotti al telefono</span></div>
+  <button class="btn sec noprint" onclick="window.print()">Stampa questa vista</button></div>
+
+<nav class="schede noprint">
+  <a href="?vista=lotti" class="{% if vista == 'lotti' %}on{% endif %}">Per lotto (banditore)</a>
+  <a href="?vista=telefonisti" class="{% if vista == 'telefonisti' %}on{% endif %}">Per telefonista</a>
+  <a href="?vista=inserisci{% if sel %}&paletta={{ sel }}{% endif %}#inserisci" class="{% if vista == 'inserisci' or sel %}on{% endif %}">Inserisci</a>
+</nav>
+
+{% if vista == 'inserisci' or sel %}
+<section id="inserisci">
+  <form method="get" class="filtri noprint"><input type="hidden" name="vista" value="inserisci">
+    <label for="paletta" style="font-weight:600">Paletta</label>
+    <input id="paletta" name="paletta" value="{{ sel }}" list="dl-palette" inputmode="numeric" placeholder="es. 201" style="width:110px" autofocus>
+    <button class="btn sec">Apri</button>
+    <span class="muted">Offerte scritte: palette 200–299 · telefono: 300–399. La paletta va prima assegnata nella pagina <a href="{% url 'palette' %}?asta={{ asta.pk }}">Palette</a>.</span>
+  </form>
+  <datalist id="dl-palette">{% for n in palette %}<option value="{{ n }}">{% endfor %}</datalist>
+
+  {% if paletta_sel %}
+  <h2>Paletta {{ paletta_sel.numero }}{% if vede_dati %} · {{ paletta_sel.acquirente.nome }}{% endif %} <span class="muted" style="font-weight:400">({{ paletta_sel.canale }})</span></h2>
+  <div class="due">
+    <form method="post" class="box">{% csrf_token %}<input type="hidden" name="paletta" value="{{ paletta_sel.numero }}">
+      <h3>Offerte scritte</h3>
+      <p class="muted" style="margin-top:0">Una riga per lotto: numero del lotto e offerta massima. Es.<br><code>12 150</code><br><code>40 1.200</code><br><code>41 80 solo se non va il 40</code></p>
+      <textarea name="testo" rows="7" style="width:100%;font:inherit" placeholder="12 150"></textarea>
+      <div class="azioni"><button class="btn" name="azione" value="offerte">Registra offerte</button></div>
+    </form>
+    <form method="post" class="box">{% csrf_token %}<input type="hidden" name="paletta" value="{{ paletta_sel.numero }}">
+      <h3>Al telefono</h3>
+      <label class="et" for="lotti-tel">Lotti</label><input id="lotti-tel" name="lotti" placeholder="12, 15, 40-42" style="width:100%">
+      <label class="et" for="tel-nome">Telefonista</label><input id="tel-nome" name="telefonista" list="dl-telefonisti" placeholder="chi chiama" style="width:100%">
+      <label class="et" for="tel-note">Note</label><input id="tel-note" name="note" placeholder="es. parla inglese, chiamare 2 lotti prima" style="width:100%">
+      <div class="azioni"><button class="btn" name="azione" value="telefoni">Registra telefono</button></div>
+    </form>
+  </div>
+  <datalist id="dl-telefonisti">{% for n in nomi_telefonisti %}<option value="{{ n }}">{% endfor %}</datalist>
+  {% if offerte_sel or telefonate_sel %}
+  <h3>Già registrato per la paletta {{ paletta_sel.numero }}</h3>
+  <table><thead><tr><th>Lotto</th><th>Titolo</th><th class="n">Base</th><th>Registro</th><th></th></tr></thead><tbody>
+    {% for o in offerte_sel %}<tr><td><b>{{ o.lotto.numero }}</b></td><td>{{ o.lotto.etichetta|truncatechars:60 }}</td><td class="n">{{ o.lotto.base_asta|euro }}</td>
+      <td>offerta fino a <b>{{ o.importo|euro }}</b>{% if o.note %} <span class="muted">· {{ o.note }}</span>{% endif %}</td>
+      <td><form method="post">{% csrf_token %}<input type="hidden" name="id" value="{{ o.pk }}"><button class="link" name="azione" value="togli_offerta">togli</button></form></td></tr>{% endfor %}
+    {% for t in telefonate_sel %}<tr><td><b>{{ t.lotto.numero }}</b></td><td>{{ t.lotto.etichetta|truncatechars:60 }}</td><td class="n">{{ t.lotto.base_asta|euro }}</td>
+      <td>al telefono{% if t.telefonista %} · {{ t.telefonista }}{% endif %}{% if t.note %} <span class="muted">· {{ t.note }}</span>{% endif %}</td>
+      <td><form method="post">{% csrf_token %}<input type="hidden" name="id" value="{{ t.pk }}"><button class="link" name="azione" value="togli_telefonata">togli</button></form></td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+  {% elif sel %}<p class="warn">La paletta {{ sel }} non è assegnata in questa asta.</p>{% endif %}
+</section>
+
+{% elif vista == 'telefonisti' %}
+<form method="post">{% csrf_token %}
+  <div class="azioni noprint"><span>Con le righe spuntate:</span><input name="telefonista" list="dl-telefonisti2" placeholder="nome del telefonista">
+    <button class="btn sec" name="azione" value="telefonista">Assegna</button></div>
+  <datalist id="dl-telefonisti2">{% for n in nomi_telefonisti %}<option value="{{ n }}">{% endfor %}</datalist>
+  {% for nome, chiamate in telefonisti %}
+  <h2 class="salto">{{ nome }} <span class="muted" style="font-weight:400">· {{ chiamate|length }} lotti</span></h2>
+  <table><thead><tr><th class="noprint"></th><th>Lotto</th><th>Torn.</th><th>Titolo</th><th class="n">Base</th><th>Paletta</th>{% if vede_dati %}<th>Chi chiamare</th><th>Telefono</th>{% endif %}<th>Note</th></tr></thead><tbody>
+    {% for t in chiamate %}<tr><td class="noprint"><input type="checkbox" name="sel" value="{{ t.pk }}"></td><td><b>{{ t.lotto.numero }}</b></td><td>{{ t.lotto.tornata|default:1 }}</td>
+      <td>{{ t.lotto.etichetta|truncatechars:60 }}</td><td class="n">{{ t.lotto.base_asta|euro }}</td><td>{{ t.paletta.numero }}</td>
+      {% if vede_dati %}<td>{{ t.paletta.acquirente.nome }}</td><td style="white-space:nowrap">{{ t.paletta.acquirente.telefono|default:"—" }}</td>{% endif %}<td>{{ t.note }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% empty %}<p class="muted">Nessun lotto al telefono. Registrali da «Inserisci».</p>{% endfor %}
+</form>
+
+{% else %}
+<p class="muted noprint">Per ogni lotto le offerte scritte dalla più alta (a parità vince la prima ricevuta) e chi è al telefono. È il foglio da dare al banditore; le offerte compaiono anche nella pagina Aggiudicazione e nelle colonne OFF del faldone.</p>
+<table class="registro"><thead><tr><th>Lotto</th><th>Titolo</th><th class="n">Base</th><th class="n">Riserva</th><th>Offerte scritte</th><th>Telefono</th></tr></thead><tbody>
+  {% for r in righe %}<tr><td><b>{{ r.lotto.numero }}</b></td><td>{{ r.lotto.etichetta|truncatechars:60 }}</td><td class="n">{{ r.lotto.base_asta|euro }}</td>
+    <td class="n">{% if r.lotto.riserva and r.lotto.riserva != r.lotto.base_asta %}{{ r.lotto.riserva|euro }}{% endif %}</td>
+    <td>{% for o in r.offerte %}<div class="{% if forloop.first %}prima{% endif %}">pal. {{ o.paletta.numero }} → {{ o.importo|euro }}{% if o.note %} <span class="muted">({{ o.note }})</span>{% endif %}</div>{% endfor %}</td>
+    <td>{% for t in r.telefoni %}<div>pal. {{ t.paletta.numero }}{% if t.telefonista %} · {{ t.telefonista }}{% endif %}</div>{% endfor %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Ancora nessuna offerta scritta o telefono. Registrali da «Inserisci».</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+
+<style>
+  .schede { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:16px 0 }
+  .schede a { padding:8px 14px; text-decoration:none; color:var(--muted); border-bottom:2px solid transparent }
+  .schede a.on { color:var(--ink); border-bottom-color:var(--accent); font-weight:600 }
+  .filtri { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 }
+  .filtri input, .box input, .azioni input { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff }
+  .due { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px }
+  .due h3 { margin:0 0 6px } .et { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px }
+  .registro .prima { font-weight:700 } button.link { border:0; background:none; color:var(--accent); cursor:pointer; font:inherit; text-decoration:underline }
+  @media print { .salto { break-before:page } .salto:first-of-type { break-before:auto } }
+</style>
+{% endblock %}

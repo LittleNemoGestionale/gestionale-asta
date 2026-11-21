@@ -44,6 +44,7 @@
   <div><b id="totale">{{ totale|euro }}</b>totale tornata</div>
 </div>
 <div id="avviso" aria-live="polite"></div>
+<style>.registro-off { font-size:12.5px; font-weight:600; color:#1d4c9b; margin-top:2px }</style>
 
 <div class="scroll"><table class="sala">
   <thead><tr><th>Lotto</th><th>Titolo</th><th class="n">Base</th><th class="n">Riserva</th><th>Paletta</th><th>Prezzo €</th><th></th></tr></thead>
@@ -52,7 +53,7 @@
     <tr id="l{{ l.pk }}" data-id="{{ l.pk }}" data-numero="{{ l.numero }}" data-stato="{{ l.stato }}"
         class="{% if l.stato == 'aggiudicato' %}venduto{% elif l.stato == 'invenduto' %}invenduto{% endif %}">
       <td class="num">{{ l.numero }}</td>
-      <td><div class="tit">{{ l.etichetta|truncatechars:70 }}</div>{% if l.illustratore %}<div class="sub">{{ l.illustratore }}</div>{% endif %}</td>
+      <td><div class="tit">{{ l.etichetta|truncatechars:70 }}</div>{% if l.illustratore %}<div class="sub">{{ l.illustratore }}</div>{% endif %}{% with reg=l.registro_banditore %}{% if reg %}<div class="registro-off" title="Offerte scritte (paletta: offerta massima) e telefoni">{{ reg|join:" · " }}</div>{% endif %}{% endwith %}</td>
       <td class="n">{{ l.base_asta|euro }}</td>
       <td class="n">{% if l.riserva and l.riserva != l.base_asta %}{{ l.riserva|euro }}{% endif %}</td>
       <td class="c-pal"><input class="pal" inputmode="numeric" autocomplete="off" aria-label="paletta lotto {{ l.numero }}"
