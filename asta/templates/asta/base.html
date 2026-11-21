@@ -68,6 +68,6 @@
 <main>
   {% block doc %}{% endblock %}
 </main>
-{% if versione %}<footer class="noprint" style="text-align:center;color:var(--muted);font-size:11.5px;padding:24px 0 16px">Gestionale Asta · versione {{ versione }}</footer>{% endif %}
+{% if versione %}<footer class="noprint" style="text-align:center;color:var(--muted);font-size:11.5px;padding:24px 0 16px">Gestionale Asta · versione {{ versione }}{% if user.is_superuser %} · <a href="{% url 'aggiorna_programma' %}" style="color:inherit">cerca aggiornamenti</a>{% endif %}</footer>{% endif %}
 </body>
 </html>

@@ -1,0 +1,25 @@
+{% extends "asta/base.html" %}
+{% block title %}Aggiorna il programma{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<h1>Aggiorna il programma</h1>
+{% if errore %}
+  <p class="warn">{{ errore }}</p>
+{% else %}
+  <p>Versione installata: <b>{{ attuale }}</b></p>
+  {% if novita %}
+    <div class="box">
+      <b>È disponibile una versione nuova</b> con queste modifiche:
+      <ul>{% for h, quando, testo in novita %}<li>{{ testo }} <span class="muted">({{ quando }})</span></li>{% endfor %}</ul>
+    </div>
+    <form method="post" class="azioni">{% csrf_token %}
+      <button class="btn">Aggiorna adesso</button>
+      <span class="muted">Il programma si ferma per circa un minuto (prima fa un backup), poi riparte da solo.
+        <b>Non farlo durante l'asta</b>: chi sta lavorando deve solo ricaricare la pagina.</span>
+    </form>
+  {% else %}
+    <p class="pill ok">Il programma è aggiornato.</p>
+  {% endif %}
+{% endif %}
+<p class="muted">Gli aggiornamenti si installano comunque da soli a ogni avvio. Lo storico è in <code>dati\aggiornamenti.log</code>.</p>
+{% endblock %}

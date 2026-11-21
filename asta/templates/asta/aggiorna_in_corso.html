@@ -1,0 +1,15 @@
+{% extends "asta/base.html" %}
+{% block title %}Aggiornamento in corso{% endblock %}
+{% block head %}<script>
+  // riprova ogni 5 secondi finché il programma non è ripartito
+  setTimeout(function prova() {
+    fetch("/", {cache: "no-store"}).then(r => { if (r.ok) location.href = "/"; else setTimeout(prova, 5000); })
+      .catch(() => setTimeout(prova, 5000));
+  }, 15000);
+</script>{% endblock %}
+{% block doc %}
+<h1>Aggiornamento in corso…</h1>
+<p>Il programma fa un backup, installa la versione nuova e riparte. Ci vuole circa un minuto:
+  questa pagina si ricarica da sola quando ha finito.</p>
+<p class="muted">Se dopo 5 minuti è ancora qui, guarda la finestra nera sul computer dell'ufficio.</p>
+{% endblock %}

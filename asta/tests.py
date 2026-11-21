@@ -852,3 +852,30 @@ class Microsoft365Test(TestCase):
     def test_spento_se_non_configurato(self):
         from . import email_util
         self.assertFalse(email_util.invio_diretto_attivo())
+
+
+class AggiornaAdessoTest(TestCase):
+    def setUp(self):
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+
+    def test_pagina_e_riavvio(self):
+        from unittest import mock
+
+        from . import views_aggiorna
+        with mock.patch.object(views_aggiorna, "stato_versioni",
+                               return_value={"attuale": "abc1234", "novita": [["def5678", "21/11 10:00", "Novità"]]}):
+            r = self.client.get("/aggiorna/")
+        self.assertContains(r, "Aggiorna adesso")
+        self.assertContains(r, "Novità")
+        with mock.patch.dict("os.environ", {"ASTA_SUPERVISORE": ""}):
+            r = self.client.post("/aggiorna/", follow=True)
+        self.assertContains(r, "chiudi la finestra nera")
+        with mock.patch.dict("os.environ", {"ASTA_SUPERVISORE": "1"}), \
+                mock.patch.object(views_aggiorna.threading, "Thread") as t:
+            r = self.client.post("/aggiorna/")
+        self.assertContains(r, "Aggiornamento in corso")
+        t.return_value.start.assert_called_once()
+
+    def test_solo_amministratore(self):
+        self.client.force_login(User.objects.create_user("clerk", password="x", is_staff=True))
+        self.assertEqual(self.client.get("/aggiorna/").status_code, 302)

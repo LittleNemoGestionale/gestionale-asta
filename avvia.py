@@ -12,6 +12,7 @@ import base64
 import os
 import secrets
 import socket
+import subprocess
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ BASE = Path(__file__).resolve().parent
 DATI = Path(os.environ.get("ASTA_DATI_DIR", BASE / "dati"))
 INI = DATI / "impostazioni.ini"
 PORTA = int(os.environ.get("ASTA_PORTA", "8000"))
+RIAVVIA = 3  # codice d'uscita del server quando si chiede «Aggiorna adesso» dal programma
 
 
 def ip_locale():
@@ -82,9 +84,27 @@ def aggiornamento_all_avvio():
 
 
 def main():
+    """Controlla gli aggiornamenti, poi tiene acceso il server; se dal programma si preme
+    «Aggiorna adesso» il server si ferma, si installa la versione nuova e riparte da solo."""
     nuovo = not INI.exists() and primo_avvio()
     if not nuovo:
         aggiornamento_all_avvio()
+    env = {**os.environ, "ASTA_SUPERVISORE": "1"}
+    while True:
+        r = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--server"]
+                           + (["--nuovo"] if nuovo else []), cwd=BASE, env=env)
+        nuovo = False
+        if r.returncode != RIAVVIA:
+            return r.returncode
+        print("\nAggiornamento richiesto dal programma: installo la versione nuova e riparto…\n")
+        try:
+            import aggiorna
+            aggiorna.aggiorna()
+        except Exception as e:  # se l'aggiornamento non riesce si riparte con la versione di prima
+            print(f"(aggiornamento non riuscito: {e})")
+
+
+def server(nuovo=False):
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     sys.path.insert(0, str(BASE))
     import django
@@ -113,4 +133,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--server" in sys.argv:
+        server(nuovo="--nuovo" in sys.argv)
+    else:
+        sys.exit(main())
