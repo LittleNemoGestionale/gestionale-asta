@@ -1127,3 +1127,25 @@ class LeggiFotoTest(TestCase):
             {"descrizione": "A. Pazienza – Ritratti", "riserva": "70", "note": "", "incerta": False},
             {"descrizione": "A. Pazienza – Il corvo", "riserva": "1500", "incerta": True,
              "note": "q.tà 2 · DA VERIFICARE: prezzo spostato di riga"}])
+
+
+class MandatoDaAstaTest(TestCase):
+    def test_nuovo_mandato_dentro_l_asta(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        asta = Asta.objects.create(numero=92, nome="Illustrazione", data=date(2099, 1, 1))
+        s = Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        r = self.client.get(f"/mandati/nuovo/?asta={asta.pk}")
+        self.assertEqual((r.context["form"].initial["asta"], r.context["form"].initial["destinazione"]),
+                         (asta, "prossima_asta"))
+        self.client.post(f"/mandati/nuovo/?asta={asta.pk}", {
+            "mandante": s.pk, "numero": "2099/092", "asta": asta.pk, "data": "2099-01-01", "commissione_pct": "15",
+            "spesa_inserimento": "10", "incolla": "Tavola 1\t\t\t\t70\nTavola 2\t\t\t\t80"})
+        m = Mandato.objects.get(numero="2099/092")
+        self.assertEqual((m.asta, m.oggetti.count()), (asta, 2))
+        r = self.client.get(f"/asta/{asta.pk}/lotti/")
+        self.assertEqual(([x.numero for x in r.context["mandati_asta"]], len(r.context["da_assegnare"])), (["2099/092"], 2))
+        r = self.client.post("/magazzino/", {"azione": "assegna", "asta": asta.pk, "sel": r.context["da_assegnare"],
+                                             "torna": f"/asta/{asta.pk}/lotti/"})
+        self.assertRedirects(r, f"/asta/{asta.pk}/lotti/")
+        self.assertEqual(sorted(asta.lotti.values_list("riserva", flat=True)), [D("70"), D("80")])

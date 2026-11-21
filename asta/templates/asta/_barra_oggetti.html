@@ -11,7 +11,7 @@
     <button class="btn" name="azione" value="applica">Applica</button>
   </div>
   <div class="riga">
-    <select name="asta"><option value="">— asta —</option>{% for a in aste_aperte %}<option value="{{ a.pk }}">Asta {{ a.numero|default:a.nome }} · {{ a.data|date:"d/m/Y" }}</option>{% endfor %}</select>
+    <select name="asta"><option value="">— asta —</option>{% for a in aste_aperte %}<option value="{{ a.pk }}" {% if a.pk == asta_predefinita %}selected{% endif %}>Asta {{ a.numero|default:a.nome }} · {{ a.data|date:"d/m/Y" }}</option>{% endfor %}</select>
     <button class="btn sec" name="azione" value="assegna">Assegna all'asta</button>
     <span class="sp"></span>
     {% block extra %}<button class="btn sec" name="azione" value="restituisci" onclick="return confirm('Segnare gli oggetti spuntati come restituiti al mandante?')">Restituiti al mandante</button>{% endblock %}

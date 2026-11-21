@@ -198,7 +198,7 @@ def ctx_barra():
 @login_required
 @permission_required("asta.view_mandato", raise_exception=True)
 def mandati(request):
-    f = {k: request.GET.get(k, "") for k in ("q", "arrivo", "dest")}
+    f = {k: request.GET.get(k, "") for k in ("q", "arrivo", "dest", "asta")}
     if request.method == "POST" and request.user.has_perm("asta.change_mandato"):
         m = get_object_or_404(Mandato, pk=request.POST.get("mandato"))
         campo = request.POST.get("campo")
@@ -206,8 +206,10 @@ def mandati(request):
             setattr(m, campo, request.POST.get("valore", ""))
             m.save(update_fields=[campo])
         return redirect(request.get_full_path())
-    qs = Mandato.objects.select_related("mandante").annotate(n_oggetti=Count("oggetti", distinct=True)) \
+    qs = Mandato.objects.select_related("mandante", "asta").annotate(n_oggetti=Count("oggetti", distinct=True)) \
         .order_by("-data", "-pk")
+    if f["asta"].isdigit():
+        qs = qs.filter(asta_id=f["asta"])
     if f["arrivo"]:
         qs = qs.filter(stato_arrivo=f["arrivo"])
     if f["dest"]:
@@ -219,16 +221,27 @@ def mandati(request):
                   or q == m.mandante.codice]
     da_ritirare = Mandato.objects.filter(stato_arrivo__in=["spediti", "non_spediti", "da_ritirare"]).count()
     return render(request, "asta/mandati.html", {"mandati": elenco[:300], "f": f, "arrivi": Mandato.Arrivo.choices,
+                                                 "aste": Asta.objects.order_by("-data")[:30],
                                                  "destinazioni": DEST.choices, "da_ritirare": da_ritirare,
                                                  "totale": len(elenco)})
 
 
 class MandatoForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        aste = Asta.objects.order_by("-data")
+        corrente = getattr(self.instance, "asta_id", None)
+        self.fields["asta"].queryset = aste.filter(Q(chiusa=False) | Q(pk=corrente or 0))
+        self.fields["asta"].label_from_instance = lambda a: f"Asta {a.numero or ''} · {a.nome} · {a.data:%d/%m/%Y}"
+        self.fields["asta"].empty_label = "— nessuna in particolare —"
+        for nome in ("stato_arrivo", "destinazione"):
+            self.fields[nome].choices = [("", "—")] + [c for c in self.fields[nome].choices if c[0]]
+
     class Meta:
         model = Mandato
-        fields = ["numero", "data", "stato_arrivo", "destinazione", "commissione_pct", "spesa_inserimento",
+        fields = ["numero", "asta", "data", "stato_arrivo", "destinazione", "commissione_pct", "spesa_inserimento",
                   "iva_su_commissione", "note_accordo"]
-        labels = {"data": "data ricezione", "note_accordo": "note"}
+        labels = {"data": "data ricezione", "note_accordo": "note", "asta": "per l'asta"}
         widgets = {"data": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
                    "note_accordo": forms.Textarea(attrs={"rows": 2})}
 
@@ -239,9 +252,11 @@ def mandato_nuovo(request, soggetto_id=None):
     s = get_object_or_404(Soggetto, pk=soggetto_id) if soggetto_id else None
     if not s and request.POST.get("mandante"):
         s = Soggetto.objects.filter(pk=request.POST["mandante"]).first()
+    asta = Asta.objects.filter(pk=request.GET.get("asta") or 0).first()
     form = MandatoForm(request.POST or None, initial={
         "numero": numero_mandato_nuovo(), "data": timezone.localdate(), "commissione_pct": 15,
-        "stato_arrivo": Mandato.Arrivo.IN_SEDE})
+        "stato_arrivo": Mandato.Arrivo.IN_SEDE, "asta": asta,
+        "destinazione": Mandato.Destinazione.PROSSIMA_ASTA if asta else ""})
     righe, errori = ([], [])
     if request.method == "POST":
         righe, errori = righe_da_post(request.POST)
@@ -272,7 +287,7 @@ def mandato_nuovo(request, soggetto_id=None):
     mandanti_elenco = sorted(Soggetto.objects.filter(is_mandante=True), key=lambda x: (x.nome or "").lower()) \
         if not soggetto_id else []
     return render(request, "asta/mandato_nuovo.html", {
-        "s": s, "form": form, "errori": errori, "mandanti": mandanti_elenco, "categorie": categorie_usate(),
+        "s": s, "form": form, "asta_di": asta, "errori": errori, "mandanti": mandanti_elenco, "categorie": categorie_usate(),
         "righe_vuote": range(5), "incolla": request.POST.get("incolla", ""), "lettura_claude": _lettura_attiva()})
 
 
@@ -327,7 +342,8 @@ def mandato(request, mandato_id):
     return render(request, "asta/mandato.html", {"m": m, "form": form, "oggetti": oggetti, "allegati": allegati,
                                                  "foto": [a for a in allegati if a.immagine],
                                                  "righe_vuote": range(5 if not oggetti else 3),
-                                                 "lettura_claude": _lettura_attiva(), **ctx_barra()})
+                                                 "lettura_claude": _lettura_attiva(), "asta_predefinita": m.asta_id,
+                                                 **ctx_barra()})
 
 
 @login_required
@@ -353,7 +369,8 @@ def magazzino(request):
             messages.error(request, "Non hai il permesso di modificare gli oggetti.")
         else:
             azione_oggetti(request, Oggetto.objects.all())
-        return redirect(request.get_full_path())
+        torna = request.POST.get("torna", "")
+        return redirect(torna if torna.startswith("/") and not torna.startswith("//") else request.get_full_path())
     qs = Oggetto.objects.all()
     if f["cat"]:
         qs = qs.filter(categoria=f["cat"])

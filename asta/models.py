@@ -153,6 +153,8 @@ class Mandato(models.Model):
 
     mandante = models.ForeignKey(Soggetto, on_delete=models.PROTECT, related_name="mandati")
     numero = models.CharField(max_length=20, unique=True)
+    asta = models.ForeignKey("Asta", on_delete=models.SET_NULL, null=True, blank=True, related_name="mandati_ricevuti",
+                             help_text="l'asta per cui è stato firmato il mandato («Mandato d'Asta n.»)")
     data = models.DateField()
     commissione_pct = models.DecimalField("commissione mandante %", max_digits=5, decimal_places=2)
     iva_su_commissione = models.BooleanField(default=False, help_text="aggiunge l'IVA sulla commissione (di solito no)")

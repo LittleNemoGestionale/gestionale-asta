@@ -2,8 +2,8 @@
 {% block title %}Nuovo mandato{% endblock %}
 {% block head %}<style>main { max-width:1400px }</style>{% endblock %}
 {% block doc %}
-<p><a href="{% if s and not mandanti %}{% url 'scheda' s.pk %}{% else %}{% url 'mandati' %}{% endif %}">← indietro</a></p>
-<h1>Nuovo mandato{% if s and not mandanti %} · {{ s.nome }}{% endif %}</h1>
+<p><a href="{% if asta_di %}{% url 'lotti_asta' asta_di.pk %}{% elif s and not mandanti %}{% url 'scheda' s.pk %}{% else %}{% url 'mandati' %}{% endif %}">← indietro</a></p>
+<h1>Nuovo mandato{% if asta_di %} per l'asta {{ asta_di.numero|default:asta_di.nome }}{% endif %}{% if s and not mandanti %} · {{ s.nome }}{% endif %}</h1>
 <p class="muted">Il mandato è il materiale affidato da un mandante: qui segnate la commissione concordata, lo stato del materiale, la destinazione e l'elenco degli oggetti (si possono aggiungere anche dopo).</p>
 {% if errori %}<div class="msg error">{{ errori|join:" · " }}</div>{% endif %}
 {% include "asta/_visore.html" %}

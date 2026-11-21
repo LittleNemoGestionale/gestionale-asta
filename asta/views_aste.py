@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .models import Asta, Lotto, Mandato
+from .models import Oggetto, Asta, Lotto, Mandato
 
 STATI_RIPROPONIBILI = [Lotto.Stato.INVENDUTO, Lotto.Stato.CONTOVENDITA]
 
@@ -216,7 +216,17 @@ def lotti_asta(request, asta_id):
     if request.GET.get("verifica"):
         lotti = lotti.filter(note_interne__startswith="DA VERIFICARE")
     mandati = Mandato.objects.select_related("mandante").order_by("mandante__codice", "-data")
+    from .views_mandati import con_lotti
+    mandati_asta = list(asta.mandati_ricevuti.select_related("mandante").order_by("numero"))
+    oggetti = con_lotti(Oggetto.objects.filter(mandato__in=mandati_asta))
+    for m in mandati_asta:
+        propri = [o for o in oggetti if o.mandato_id == m.pk]
+        m.n_ogg = len(propri)
+        m.n_in_asta = sum(1 for o in propri if any(l.asta_id == asta.pk for l in o._lotti))
+        m.n_disp = sum(1 for o in propri if o.disponibile)
+    da_assegnare = [o.pk for o in oggetti if o.disponibile]
     return render(request, "asta/lotti.html", {"asta": asta, "lotti": lotti, "form": form, "puo": puo,
+                                               "mandati_asta": mandati_asta, "da_assegnare": da_assegnare,
                                                "mandati": mandati, "n_foto": n_foto, "n_verifica": n_verifica,
                                                "solo_foto": bool(request.GET.get("foto")),
                                                "solo_verifica": bool(request.GET.get("verifica"))})

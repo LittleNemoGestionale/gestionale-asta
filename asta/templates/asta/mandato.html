@@ -5,7 +5,7 @@
 {% for x in messages %}<div class="msg {{ x.tags }}">{{ x }}</div>{% endfor %}
 <p><a href="{% url 'mandati' %}">← Mandati</a></p>
 <h1>Mandato {{ m.numero }} · {% if perms.asta.view_dati_personali %}<a href="{% url 'scheda' m.mandante_id %}">{{ m.mandante.nome }}</a>{% else %}mandante {{ m.mandante.codice }}{% endif %}</h1>
-<p class="muted">Ricevuto il {{ m.data|date:"d/m/Y" }} · commissione {{ m.commissione_pct|floatformat:0 }}% · {{ oggetti|length }} oggetti
+<p class="muted">{% if m.asta %}Per l'<a href="{% url 'lotti_asta' m.asta_id %}">asta {{ m.asta.numero|default:m.asta.nome }}</a> · {% endif %}Ricevuto il {{ m.data|date:"d/m/Y" }} · commissione {{ m.commissione_pct|floatformat:0 }}% · {{ oggetti|length }} oggetti
   {% if m.stato_arrivo %}· <b>{{ m.get_stato_arrivo_display }}</b>{% endif %}{% if m.destinazione %} · destinazione <b>{{ m.get_destinazione_display }}</b>{% endif %}</p>
 {% if "DA VERIFICARE" in m.note_accordo %}<div class="msg info">{{ m.note_accordo }}</div>{% endif %}
 

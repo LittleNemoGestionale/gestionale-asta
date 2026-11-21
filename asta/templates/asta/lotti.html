@@ -12,6 +12,23 @@
   <a class="btn" href="{% url 'faldone' asta.pk %}">⬇ Scarica il faldone</a>
 </div>
 
+<h2>Mandati per questa asta</h2>
+<div class="box">
+  {% if mandati_asta %}<table style="margin-top:0"><thead><tr><th>Mandato</th><th>Mandante</th><th class="n">Oggetti</th><th class="n">Già lotti</th><th class="n">Da mettere in asta</th></tr></thead><tbody>
+    {% for m in mandati_asta %}<tr><td><a href="{% url 'mandato' m.pk %}"><b>{{ m.numero }}</b></a></td>
+      <td>{% if perms.asta.view_dati_personali %}{{ m.mandante.nome }}{% else %}{{ m.mandante.codice }}{% endif %}</td>
+      <td class="n">{{ m.n_ogg }}</td><td class="n">{{ m.n_in_asta }}</td><td class="n">{{ m.n_disp }}</td></tr>{% endfor %}
+  </tbody></table>{% else %}<p class="muted" style="margin-top:0">Nessun mandato registrato per questa asta.</p>{% endif %}
+  <div class="azioni" style="margin-bottom:0">
+    {% if perms.asta.add_mandato %}<a class="btn" href="{% url 'mandato_nuovo' %}?asta={{ asta.pk }}">+ Nuovo mandato per l'asta {{ asta.numero|default:asta.nome }}</a>{% endif %}
+    {% if da_assegnare and perms.asta.change_mandato %}<form method="post" action="{% url 'magazzino' %}" style="display:inline">{% csrf_token %}
+      {% for id in da_assegnare %}<input type="hidden" name="sel" value="{{ id }}">{% endfor %}
+      <input type="hidden" name="asta" value="{{ asta.pk }}"><input type="hidden" name="torna" value="{{ request.path }}">
+      <button class="btn sec" name="azione" value="assegna">Metti in asta i {{ da_assegnare|length }} oggetti ancora da inserire</button></form>{% endif %}
+    <span class="muted" style="font-size:12px">Se il catalogo lo fate in Word, caricate il Word: i lotti si collegano da soli agli oggetti di questi mandati.</span>
+  </div>
+</div>
+
 <h2>Aggiungi un lotto</h2>
 <form method="post" class="campi box">{% csrf_token %}
   {% if form.non_field_errors %}<div class="largo">{{ form.non_field_errors }}</div>{% endif %}

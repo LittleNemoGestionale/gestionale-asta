@@ -11,20 +11,22 @@
 <form class="filtri" method="get">
   <input name="q" value="{{ f.q }}" placeholder="Cerca mandante o n° mandato">
   <select name="arrivo" onchange="this.form.submit()"><option value="">Stato del materiale: tutti</option>{% for v, l in arrivi %}<option value="{{ v }}" {% if f.arrivo == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <select name="asta" onchange="this.form.submit()"><option value="">Asta: tutte</option>{% for a in aste %}<option value="{{ a.pk }}" {% if f.asta == a.pk|stringformat:"s" %}selected{% endif %}>Asta {{ a.numero|default:a.nome }}</option>{% endfor %}</select>
   <select name="dest" onchange="this.form.submit()"><option value="">Destinazione: tutte</option>{% for v, l in destinazioni %}<option value="{{ v }}" {% if f.dest == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
-  <button class="btn sec">Cerca</button>{% if f.q or f.arrivo or f.dest %} <a href="?">Togli i filtri</a>{% endif %}
+  <button class="btn sec">Cerca</button>{% if f.q or f.arrivo or f.dest or f.asta %} <a href="?">Togli i filtri</a>{% endif %}
 </form>
 <div class="scroll"><table>
-  <thead><tr><th>N° mandato</th><th>Mandante</th><th>Ricevuto il</th><th class="n">Oggetti</th><th class="n">Comm.</th><th>Stato del materiale</th><th>Destinazione</th></tr></thead>
+  <thead><tr><th>N° mandato</th><th>Mandante</th><th>Asta</th><th>Ricevuto il</th><th class="n">Oggetti</th><th class="n">Comm.</th><th>Stato del materiale</th><th>Destinazione</th></tr></thead>
   <tbody>{% for m in mandati %}<tr>
     <td><a href="{% url 'mandato' m.pk %}"><b>{{ m.numero }}</b></a></td>
     <td>{% if perms.asta.view_dati_personali %}<a href="{% url 'scheda' m.mandante_id %}">{{ m.mandante.nome }}</a>{% else %}{{ m.mandante.codice }}{% endif %}</td>
+    <td>{% if m.asta %}<a href="{% url 'lotti_asta' m.asta_id %}">{{ m.asta.numero|default:m.asta.nome }}</a>{% endif %}</td>
     <td>{{ m.data|date:"d/m/Y" }}</td><td class="n">{{ m.n_oggetti }}</td><td class="n">{{ m.commissione_pct|floatformat:0 }}%</td>
     <td>{% if perms.asta.change_mandato %}<form method="post">{% csrf_token %}<input type="hidden" name="mandato" value="{{ m.pk }}"><input type="hidden" name="campo" value="stato_arrivo">
       <select name="valore" onchange="this.form.submit()"><option value="">—</option>{% for v, l in arrivi %}<option value="{{ v }}" {% if m.stato_arrivo == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></form>{% else %}{{ m.get_stato_arrivo_display }}{% endif %}</td>
     <td>{% if perms.asta.change_mandato %}<form method="post">{% csrf_token %}<input type="hidden" name="mandato" value="{{ m.pk }}"><input type="hidden" name="campo" value="destinazione">
       <select name="valore" onchange="this.form.submit()"><option value="">—</option>{% for v, l in destinazioni %}<option value="{{ v }}" {% if m.destinazione == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></form>{% else %}{{ m.get_destinazione_display }}{% endif %}</td>
-  </tr>{% empty %}<tr><td colspan="7" class="muted">Nessun mandato{% if f.q or f.arrivo or f.dest %} con questi filtri{% endif %}.</td></tr>{% endfor %}</tbody>
+  </tr>{% empty %}<tr><td colspan="8" class="muted">Nessun mandato{% if f.q or f.arrivo or f.dest %} con questi filtri{% endif %}.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% if totale > 300 %}<p class="muted">Mostrati i 300 più recenti su {{ totale }}: usa i filtri per trovare gli altri.</p>{% endif %}
 <style>.filtri{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.filtri input,.filtri select,td select{font:inherit;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff}</style>
