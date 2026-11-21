@@ -1,0 +1,22 @@
+{% load euro %}{% autoescape off %}Gentile {{ p.acquirente.nome }},
+
+La ringraziamo per aver partecipato all'asta {{ asta.numero }} «{{ asta.nome }}» del {{ asta.data|date:"j F Y" }}. Ecco il riepilogo dei lotti aggiudicati con la paletta {{ p.numero }}:
+{% for a in s.aggiudicazioni %}
+- Lotto {{ a.lotto.numero }}: {{ a.lotto.etichetta|truncatechars:70 }} — {{ a.prezzo_martello|euro }}{% endfor %}
+
+Totale aggiudicazioni: {{ s.martello|euro }}
+Diritti d'asta {{ p.diritti_effettivi|floatformat:0 }}%: {{ s.diritti|euro }}
+{{ p.modalita.nome }}: {{ s.spese_spedizione|euro }}
+TOTALE: {{ s.totale|euro }}{% if s.incassato %}
+Già versato: {{ s.incassato|euro }} — Resta da pagare: {{ s.residuo|euro }}{% endif %}
+{% if s.residuo > 0 %}
+Pagamento: bonifico bancario{% if iban %} sul conto {{ iban }} intestato a {{ intestatario }}{% endif %}, causale "Asta {{ asta.numero }} - paletta {{ p.numero }}".{% endif %}
+{% if p.modalita.testo_email %}{{ p.modalita.testo_email }}{% endif %}
+{% if indirizzo %}
+Indirizzo di spedizione:
+{% for r in indirizzo.righe %}{{ r }}
+{% endfor %}Se è cambiato, ce lo comunichi rispondendo a questa email.{% endif %}
+
+Cordiali saluti,
+{{ firma }}
+{% endautoescape %}

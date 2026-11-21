@@ -1,0 +1,27 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Aste{% endblock %}
+{% block doc %}
+<div class="azioni" style="justify-content:space-between">
+  <h1 style="margin:0">Aste</h1>
+  {% if perms.asta.add_asta %}<a class="btn" href="{% url 'asta_nuova' %}">+ Nuova asta</a>{% endif %}
+</div>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+<h2>In corso</h2>
+<p class="muted">Aste già battute ma non ancora chiuse: incassi, spedizioni e pagamenti ai mandanti in lavorazione.</p>
+<div class="sezione-aste">{% for a in in_corso %}{% include "asta/_asta_card.html" %}{% empty %}<p class="muted">Nessuna asta in corso.</p>{% endfor %}</div>
+
+<h2>Prossime</h2>
+<p class="muted">Aste in preparazione: qui si caricano i lotti.</p>
+<div class="sezione-aste">{% for a in prossime %}{% include "asta/_asta_card.html" %}{% empty %}<p class="muted">Nessuna asta in programma. {% if perms.asta.add_asta %}<a href="{% url 'asta_nuova' %}">Crea la prossima</a>.{% endif %}</p>{% endfor %}</div>
+
+<h2>Passate</h2>
+<table>
+  <thead><tr><th>Asta</th><th>Data</th><th class="n">Lotti</th><th class="n">Venduti</th><th class="n">Totale martello</th><th></th></tr></thead>
+  <tbody>{% for a in passate %}
+    <tr><td><b>{% if a.numero %}Asta {{ a.numero }}{% endif %}</b> {{ a.nome }}</td><td>{{ a.data|date:"d/m/Y" }}</td>
+      <td class="n">{{ a.n_lotti }}</td><td class="n">{{ a.n_aggiudicati }}</td><td class="n">{{ a.totale|euro }}</td>
+      <td class="n"><a href="{% url 'asta_cruscotto' a.pk %}">Apri →</a></td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Nessuna asta conclusa.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

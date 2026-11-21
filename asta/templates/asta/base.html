@@ -1,0 +1,73 @@
+{% load euro %}<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Gestionale Asta{% endblock %}</title>
+<style>
+  :root { --ink:#1d1d1f; --muted:#6b6b70; --line:#d9d9de; --accent:#7a1f2b; --bg:#fff; --soft:#f6f5f2; }
+  * { box-sizing:border-box; }
+  body { font:14px/1.45 -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--ink); background:var(--bg); margin:0; }
+  .bar { background:var(--accent); color:#fff; padding:10px 24px; display:flex; gap:20px; align-items:center; }
+  .bar a { color:#fff; text-decoration:none; opacity:.9; white-space:nowrap }
+  .bar { flex-wrap:wrap; row-gap:6px; font-size:14px } .bar a:hover { opacity:1; text-decoration:underline }
+  .bar .brand { font-weight:600; margin-right:auto }
+  main { max-width:1000px; margin:24px auto; padding:0 24px; }
+  h1 { font-size:22px; margin:0 0 4px } h2 { font-size:16px; margin:28px 0 8px }
+  .muted { color:var(--muted) }
+  table { width:100%; border-collapse:collapse; margin:10px 0 }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top }
+  th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600 }
+  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap }
+  tfoot td { font-weight:600; border-top:2px solid var(--ink); border-bottom:none }
+  .tot { margin-left:auto; width:340px } .tot td { border:none; padding:3px 8px } .tot tr.big td { font-size:17px; font-weight:700; border-top:2px solid var(--ink) }
+  .box { border:1px solid var(--line); border-radius:8px; padding:14px 16px; background:var(--soft) }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px }
+  .kpi b { display:block; font-size:24px }
+  .btn { display:inline-block; padding:7px 14px; border-radius:6px; background:var(--accent); color:#fff; text-decoration:none; border:0; font:inherit; cursor:pointer }
+  .btn.sec { background:#fff; color:var(--accent); border:1px solid var(--accent) }
+  .doc-head { display:flex; justify-content:space-between; border-bottom:2px solid var(--ink); padding-bottom:10px; margin-bottom:18px }
+  .doc-head .casa { font-weight:700; font-size:18px; letter-spacing:.02em }
+  .msg { padding:8px 12px; border-radius:6px; margin:6px 0 } .msg.success{background:#e4f4e6} .msg.error{background:#fbe3e3} .msg.info{background:#e7eefb}
+  .print { float:right }
+  form.campi { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px 16px; align-items:start }
+  form.campi .largo { grid-column:1/-1 }
+  form.campi label { display:block; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px }
+  form.campi input, form.campi textarea, form.campi select { width:100%; font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:#fff }
+  form.campi input[type=checkbox] { width:auto }
+  form.campi .aiuto { font-size:12px; color:var(--muted); margin-top:3px }
+  .errorlist { color:#b00020; margin:4px 0; padding-left:18px }
+  .azioni { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0 }
+  .sezione-aste { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px }
+  .asta-card { display:grid; gap:6px; border:1px solid var(--line); border-radius:10px; padding:14px 16px; text-decoration:none; color:var(--ink); background:#fff }
+  .asta-card:hover { border-color:var(--accent) }
+  .asta-card .num { font-size:13px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:.05em }
+  .asta-card h3 { margin:0; font-size:17px }
+  .pill { display:inline-block; padding:1px 9px; border-radius:10px; font-size:12px; font-weight:600; white-space:nowrap }
+  .pill.ok { background:#dff3e3; color:#1e6b34 } .pill.mid { background:#fff2b3; color:#7a5a00 } .pill.no { background:#fbe3e3; color:#9b1c1c }
+  tr.ok td { background:#f3fbf4 } tr.mid td { background:#fffbea }
+  .warn { color:#b00020; font-weight:600 }
+  .scroll { overflow-x:auto }
+  @media print { .bar, .print, .noprint { display:none !important } main { margin:0; max-width:none } body { font-size:12px } }
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<nav class="bar">
+  <a class="brand" href="{% url 'home' %}" style="opacity:1;text-decoration:none">Gestionale Asta</a>
+  {% if perms.asta.view_dati_personali %}<a href="{% url 'anagrafica' %}">Anagrafica</a>{% endif %}
+  {% if perms.asta.view_paletta %}<a href="{% url 'palette' %}{% if asta and asta.pk %}?asta={{ asta.pk }}{% endif %}">Palette</a>{% endif %}
+  <a href="{% url 'aste' %}">Aste</a>
+  {% if asta and asta.pk %}<span style="opacity:.6">|</span> <b style="font-weight:600">{% if asta.numero %}Asta {{ asta.numero }}{% else %}{{ asta.nome|truncatechars:20 }}{% endif %}</b><a href="{% url 'asta_cruscotto' asta.pk %}">Riepilogo</a><a href="{% url 'lotti_asta' asta.pk %}">Lotti</a><a href="{% url 'sala' asta.pk %}">Aggiudicazione</a>
+    {% if perms.asta.view_dati_personali %}<a href="{% url 'acquirenti' asta.pk %}">Acquirenti</a><a href="{% url 'mandanti' asta.pk %}">Mandanti</a>{% endif %}
+    {% if perms.asta.view_incasso %}<a href="{% url 'incassi' asta.pk %}">Incassi</a>{% endif %}
+{% endif %}
+  {% if user.is_superuser %}<a href="/admin/" style="opacity:.65;font-size:13px" title="Tabelle tecniche, per correzioni">Archivio tecnico</a>{% endif %}
+  {% if perms.asta.change_mandato %}<span title="Ultimo backup" style="font-size:12px;opacity:.85{% if 'avvisi' in ultimo_backup or 'mai' in ultimo_backup %};background:#fff;color:#b00020;padding:2px 8px;border-radius:10px;opacity:1{% endif %}">Backup: {{ ultimo_backup }}</span>{% endif %}
+</nav>
+<main>
+  {% block doc %}{% endblock %}
+</main>
+{% if versione %}<footer class="noprint" style="text-align:center;color:var(--muted);font-size:11.5px;padding:24px 0 16px">Gestionale Asta · versione {{ versione }}</footer>{% endif %}
+</body>
+</html>

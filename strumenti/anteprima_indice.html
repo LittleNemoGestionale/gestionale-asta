@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Novità e domande</title>
+<style>
+  :root { --ink:#1f1c1d; --muted:#6a6264; --line:#e3dedf; --accent:#7a1f2b; --soft:#f6f5f4; --ok:#1e6b34; --okbg:#e2f3e6 }
+  body { margin:0; background:#fff; color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Inter, Arial, sans-serif }
+  main { max-width:820px; margin:0 auto; padding:28px 16px 56px }
+  h1 { font-size:26px; margin:0 0 6px } h2 { font-size:18px; margin:30px 0 10px }
+  p { margin:0 0 10px } .muted { color:var(--muted) }
+  a { color:var(--accent) }
+  .mappa { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:12px }
+  .mappa div { border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:var(--soft) }
+  .mappa b { display:block; margin-bottom:4px }
+  ul { margin:0; padding-left:20px } li { margin:6px 0 }
+  .nuovo { background:var(--okbg); border-radius:10px; padding:14px 18px }
+  .nuovo li::marker { color:var(--ok) }
+  ol li { margin:10px 0 }
+</style>
+</head>
+<body>
+<main>
+  <h1>Novità e domande aperte</h1>
+  <p class="muted">Questa pagina accompagna l'anteprima. Per usare il programma torna alla <a href="index.html">pagina iniziale</a>.</p>
+
+  <h2>Prova da zero: l'asta 95</h2>
+  <p>L'<b>asta 95 «Grafica e manifesti d'epoca»</b> è appena stata aperta: ha tema, giorni, 2 tornate con i loro orari e fasce di palette, ma <b>nessun lotto e nessuna paletta</b>. Segui i passi come faresti per un'asta vera (nell'anteprima i pulsanti non salvano: guardi i moduli e come si compilano):</p>
+  <ol>
+    <li><a href="asta-modifica-4.html">Dati dell'asta</a>: numero, tema, giorni dell'asta, orari delle tornate, fasce di palette, diritti.</li>
+    <li><a href="lotti-importa-4.html">Carica il catalogo Word</a> (le «Schede Proprietà»), oppure <a href="lotti-4.html">aggiungi i lotti a mano</a> o <a href="riproponi-4.html">riproponi gli invenduti</a> delle aste precedenti. Se un mandante è nuovo: <a href="scheda-nuova.html">nuova scheda</a>.</li>
+    <li><a href="excel-faldone-4.html">Scarica il faldone</a> (qui è vuoto: si riempie con i lotti).</li>
+    <li><a href="palette-4.html">Assegna le palette</a> ai clienti man mano che si iscrivono (sala, telefono, offerte scritte, LiveAuctioneers).</li>
+    <li>Il giorno dell'asta: <a href="sala-4.html">aggiudicazione lotti</a>. Dopo: acquirenti, mandanti, post asta, incassi (dal <a href="cruscotto-4.html">riepilogo dell'asta 95</a>).</li>
+  </ol>
+  <p class="muted">Per vedere le stesse pagine già piene guarda l'asta 94 (a metà) e la 93 (finita).</p>
+
+  <h2>Come è organizzato il programma</h2>
+  <p>La pagina iniziale ha tre scelte:</p>
+  <div class="mappa">
+    <div><b><a href="anagrafica.html">Anagrafica</a></b>Schede di clienti e mandanti, con acquisti passati e lotti affidati.</div>
+    <div><b><a href="palette-3.html">Palette</a></b>Assegnare un numero di paletta a un cliente per un'asta.</div>
+    <div><b><a href="aste.html">Aste</a></b>Aprire una nuova asta, caricare i lotti, consultare le aste passate.</div>
+  </div>
+  <p style="margin-top:12px">Dentro ogni asta il <a href="cruscotto-1.html">riepilogo</a> è diviso in tre fasi: <b>prima</b> (lotti, palette), <b>durante</b> (sala) e <b>dopo</b> (incassi, conti, pagamenti ai mandanti, invenduti).</p>
+
+  <h2>Novità di questo aggiornamento</h2>
+  <div class="nuovo"><ul>
+    <li><b>Mandanti: rendiconti</b>. Il mandante riceve <b>aggiudicato − diritti d'asta concordati − spese</b>: 10 € per ogni lotto inserito a catalogo (venduto o no, modificabile per mandato) più le spese aggiunte a mano (restauri, cornici…). Il <b>PDF</b> è come il vostro documento, con numero di riferimento progressivo; l'email con il PDF allegato si apre in Outlook o parte direttamente dal programma, se configurate la casella.
+      <a href="mandanti-1.html">Mandanti asta 93</a> · <a href="conteggio-mandante-1-3.html">esempio di rendiconto PDF</a> · <a href="email-mandante-1-3.html">esempio di email</a>.</li>
+    <li><b>Conteggio aggiudicazioni per paletta</b> (chi ha comprato e quanto deve pagare), con il <b>PDF</b> come il vostro documento «Aggiudicazioni relative alla Paletta N.»: per una paletta o tutte insieme, e allegato all'email. Filtro «devono ancora pagare».
+      <a href="acquirenti-1.html">Acquirenti asta 93</a> · <a href="conteggio-1-300.html">esempio di PDF</a>.</li>
+    <li><b>Fasce di palette</b> per canale, modificabili per ogni asta: sala 1–199 e 400–799, offerte scritte 200–299, telefono 300–399, post asta 800–899, LiveAuctioneers 900+ (23%). Quando assegni una paletta scegli come partecipa e il numero libero si propone da solo: <a href="palette-3.html">palette asta 94</a>. La consegna non si sceglie più qui.</li>
+    <li><b>Post asta</b> per 30 giorni (modificabile): si vendono gli invenduti; chi non ha già una paletta riceve un numero della fascia 800. Le vendite entrano in incassi e rendiconti: <a href="post-asta-1.html">post asta dell'asta 93</a>.</li>
+    <li><b>Acquirenti: consegna ed email</b>, dopo l'asta: per ogni acquirente scegli ritiro o spedizione (Italia / UE / fuori UE / corriere dell'acquirente), il costo si propone in base alla nazione; poi l'email con il riepilogo si apre in <b>Outlook</b> già compilata. <a href="acquirenti-1.html">Acquirenti asta 93</a> · <a href="email-1-201.html">esempio di email</a>.</li>
+    <li><b>Aggiudicazione lotti durante l'asta</b>: una riga per lotto, si scrivono <b>paletta e prezzo</b> e con Invio si salva e si passa al lotto dopo; tasti Invenduto e Correggi; avviso se il prezzo è sotto riserva o sotto la base; paletta inesistente segnalata in rosso; divisa per tornate; si aggiorna da sola su tutti i computer.
+      <a href="sala-3.html">Provala sull'asta 94</a> (a metà: lotti 1-5 battuti; in anteprima il salvataggio è simulato).</li>
+    <li><b>Carica il catalogo Word</b> così come lo scrivete oggi: sezioni, «00. Titolo», descrizione, riga «€ base/stima R riserva MANDANTE note». I lotti 00 vengono numerati in ordine; le sezioni «Da inserire / Prossime aste» sono saltate; i mandanti scritti a parole si abbinano una volta sola; i lotti si dividono in tornate indicando da quale lotto parte ciascuna.
+      <a href="lotti-importa-3.html">Esempio di caricamento</a> (catalogo inventato: 5 lotti pronti, 1 mandante da abbinare, 1 senza prezzo, 1 escluso).</li>
+    <li><b>Faldone</b> creato dal programma con gli stessi fogli del vostro: Foglio1, DAPHNE (gestione), SERGIO (battitore, breve, con le righe di cambio tornata), un foglio per tornata, FAX (registrazione aggiudicazioni), ASSICURAZIONE (con il totale assicurato).
+      <a href="excel-faldone-1.html">Faldone asta 93</a> · <a href="excel-faldone-3.html">asta 94</a>.</li>
+    <li>Si può caricare anche <b>un faldone esistente</b> come catalogo (provato sul vostro AT93: 369 lotti, divisi nelle 3 tornate).</li>
+    <li><b>Orari delle tornate</b> nell'apertura dell'asta (giorno e ora di ciascuna): <a href="asta-modifica-3.html">esempio</a>.</li>
+    <li><b>Consegna decisa dopo l'asta</b>: la paletta nasce «da decidere»; ritiro o spedizione (con le spese) si sceglie dopo, nell'elenco palette: <a href="palette-1.html">asta 93</a>.</li>
+    <li>Nei lotti: <b>titolo, illustratore, sezione, note di lavoro</b> e il filtro <b>«da fotografare»</b>: <a href="lotti-3.html">lotti asta 94</a>.</li>
+  </ul></div>
+
+  <h2>Dagli aggiornamenti precedenti</h2>
+  <ul>
+    <li>Anagrafica: <a href="anagrafica.html">ricerca</a>, <a href="scheda-14.html">cliente con spedizione diversa</a>, <a href="scheda-1.html">mandante con lotti affidati</a>.</li>
+    <li>Aste: <a href="aste.html">elenco</a>, <a href="asta-nuova.html">apri una nuova asta</a>, <a href="cruscotto-1.html">riepilogo prima / durante / dopo</a>.</li>
+    <li>Lotti: <a href="riproponi-3.html">riproponi invenduti</a>. Sala: <a href="sala-1.html">schermata del clerk</a>.</li>
+    <li>Contabilità: <a href="incassi-1.html">incassi</a>, <a href="pagamenti-mandanti-1.html">pagamenti ai mandanti</a>, <a href="excel-incassi-1.html">Excel incassi</a>, <a href="excel-mandanti-1.html">Excel pagamenti</a>.</li>
+  </ul>
+
+  <h2>Da confermare</h2>
+  <ol>
+    <li><b>Rendiconto mandante, «Riferimento 98 / 1»</b>: che cos'è il secondo numero? Io ho messo numero progressivo / anno.</li>
+    <li><b>Invio automatico delle email</b>: la casella da cui scrivete è su Microsoft 365 / Outlook.com o di un altro fornitore (Aruba, Register…)? Per l'invio diretto mi servono il server di posta e una password per le app; senza, le email si aprono in Outlook già pronte.</li>
+    <li><b>Codice cliente</b>: nel vostro documento è nel formato «02.01.04693». Lo teniamo così (lo riprendiamo dal vecchio gestionale quando importiamo l'anagrafica) o va bene un numero semplice per i nuovi clienti?</li>
+    <li><b>Costi di spedizione</b>: ho messo Italia 25 €, UE 40 €, fuori UE 60 € come proposta (si cambiano per ogni acquirente e nelle impostazioni). Quali usate davvero? Dipendono dal numero di lotti o dal peso?</li>
+    <li><b>Email</b>: usate Outlook installato sul computer (classico) o il «nuovo Outlook» / Outlook sul web? Cambia il modo di aprire le bozze. Gli acquirenti di LiveAuctioneers vanno scritti in inglese?</li>
+    <li><b>Riga «€ 40/80» del catalogo:</b> l'ho letta come <b>base 40</b> (Base Catalogo) e <b>stima 80</b> (Valore C.A.), con «R100» come riserva (Prezzo). È giusto?</li>
+    <li><b>Mandanti nel catalogo</b> (es. «ROSSI»): il programma li riconosce dal cognome o dalla ragione sociale in anagrafica, e se non è sicuro chiede di abbinarli. Nel faldone il numero mandante (es. 4009) è il numero del mandato?</li>
+    <li><b>Foglio SERGIO, colonna DESCRIZIONE:</b> nel vostro faldone è una nota corta scritta a mano (es. «42 fascicoli»). Ho previsto un campo «descrizione breve» per ogni lotto; se è vuoto si usa l'illustratore. Va bene?</li>
+    <li><b>Faldone AT93:</b> i lotti 135, 299 e 364 compaiono due volte. Sono dei «bis»?</li>
+    <li><b>Interessi, codici dei mandanti, palette in sala dal 101</b>: restano da confermare dal giro precedente.</li>
+  </ol>
+</main>
+</body>
+</html>

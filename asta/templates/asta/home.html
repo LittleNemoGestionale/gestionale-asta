@@ -1,0 +1,38 @@
+{% extends "asta/base.html" %}
+{% block title %}Gestionale Asta{% endblock %}
+{% block head %}<style>
+  .scelte { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:16px; margin:18px 0 30px }
+  .scelta { display:grid; gap:8px; align-content:start; padding:22px; border:1px solid var(--line); border-radius:12px; background:#fff; text-decoration:none; color:var(--ink) }
+  .scelta:hover { border-color:var(--accent); box-shadow:0 2px 10px rgba(122,31,43,.08) }
+  .scelta .ico { font-size:28px; line-height:1 }
+  .scelta h2 { margin:0; font-size:20px }
+  .scelta p { margin:0; color:var(--muted) }
+  .scelta .link { color:var(--accent); font-weight:600; margin-top:4px }
+  .aste-aperte { display:grid; gap:10px }
+  .riga-asta { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:12px 16px; border:1px solid var(--line); border-radius:10px; background:var(--soft) }
+  .riga-asta b { font-size:16px; margin-right:auto }
+  .riga-asta a { color:var(--accent); font-weight:500 }
+</style>{% endblock %}
+{% block doc %}
+<h1>Cosa vuoi fare?</h1>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<div class="scelte">
+  <a class="scelta" href="{% url 'anagrafica' %}"><span class="ico">👤</span><h2>Anagrafica</h2>
+    <p>Schede di clienti e mandanti: dati, indirizzi, IBAN, interessi, acquisti passati e lotti affidati.</p>
+    <span class="muted">{{ n_clienti }} clienti · {{ n_mandanti }} mandanti</span><span class="link">Apri l'anagrafica →</span></a>
+  <a class="scelta" href="{% url 'palette' %}"><span class="ico">🪧</span><h2>Assegna palette</h2>
+    <p>Dai un numero di paletta a un cliente per l'asta, con la scelta tra ritiro e spedizione.</p><span class="link">Assegna palette →</span></a>
+  <a class="scelta" href="{% url 'aste' %}"><span class="ico">🔨</span><h2>Aste</h2>
+    <p>Apri una nuova asta (numero, tema, date, tornate), carica i lotti, consulta le aste passate.</p><span class="link">Vai alle aste →</span></a>
+</div>
+
+{% if in_corso or prossime %}
+<h2>Aste aperte</h2>
+<div class="aste-aperte">
+  {% for a in prossime %}<div class="riga-asta"><b>Asta {{ a.numero }} · {{ a.nome }}</b><span class="muted">dal {{ a.data|date:"d/m/Y" }}</span>
+    <span class="pill mid">in preparazione</span><a href="{% url 'lotti_asta' a.pk %}">Lotti</a><a href="{% url 'palette' %}?asta={{ a.pk }}">Palette</a><a href="{% url 'asta_cruscotto' a.pk %}">Riepilogo</a></div>{% endfor %}
+  {% for a in in_corso %}<div class="riga-asta"><b>Asta {{ a.numero }} · {{ a.nome }}</b><span class="muted">{{ a.data|date:"d/m/Y" }}</span>
+    <span class="pill ok">{% if a.post_asta_aperto %}post asta fino al {{ a.fine_post_asta|date:"d/m" }}{% else %}battuta, da chiudere{% endif %}</span><a href="{% url 'asta_cruscotto' a.pk %}">Riepilogo</a>{% if a.post_asta_aperto and perms.asta.view_dati_personali %}<a href="{% url 'post_asta' a.pk %}">Post asta</a>{% endif %}{% if perms.asta.view_incasso %}<a href="{% url 'incassi' a.pk %}">Incassi</a><a href="{% url 'pagamenti_mandanti' a.pk %}">Pagamenti mandanti</a>{% endif %}</div>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

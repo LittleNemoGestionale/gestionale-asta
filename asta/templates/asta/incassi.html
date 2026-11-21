@@ -1,0 +1,43 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Incassi – {{ asta.nome }}{% endblock %}
+{% block doc %}
+<h1>Incassi · {{ asta.nome }}</h1>
+<p class="muted">{{ righe|length }} acquirenti · <b>{{ n_da_incassare }}</b> ancora da saldare ·
+  <a class="btn sec" href="{% url 'excel_contabilita' asta.pk 'incassi' %}">⬇ Excel incassi per la contabile</a></p>
+
+<div class="grid">
+  <div class="box kpi"><span class="muted">Totale da incassare</span><b>{{ tot.totale|euro }}</b></div>
+  <div class="box kpi"><span class="muted">Incassato</span><b>{{ tot.incassato|euro }}</b></div>
+  <div class="box kpi"><span class="muted">Ancora da incassare</span><b>{{ tot.residuo|euro }}</b></div>
+  <div class="box kpi"><span class="muted">di cui diritti</span><b>{{ tot.diritti|euro }}</b></div>
+</div>
+
+<div class="scroll"><table>
+  <thead><tr><th>Paletta</th><th class="n">Aggiudic.</th><th class="n">Diritti</th><th class="n">Spese</th><th class="n">Totale</th>
+    <th>Incassi</th><th>Documento</th><th>Consegna / note</th><th class="n">Residuo</th><th>Stato</th><th></th></tr></thead>
+  <tbody>{% for r in righe %}
+    <tr class="{% if r.stato == 'incassato' %}ok{% elif r.stato == 'parziale' %}mid{% endif %}">
+      <td><b>{{ r.p.numero }}</b>{% if r.p.diritti_pct is not None %} <span class="muted">({{ r.p.diritti_effettivi|floatformat:0 }}%)</span>{% endif %}</td>
+      <td class="n">{{ r.martello|euro }}</td><td class="n">{{ r.diritti|euro }}</td><td class="n">{{ r.spese_spedizione|euro }}</td>
+      <td class="n"><b>{{ r.totale|euro }}</b>{% if r.abbuono %}<br><span class="muted">abbuono −{{ r.abbuono|euro }}</span>{% endif %}</td>
+      <td>{% for i in r.incassi %}{{ i.metodo.sigla }} {{ i.importo|euro }} <span class="muted">{{ i.data|date:"d/m" }}</span><br>{% empty %}<span class="muted">—</span>{% endfor %}
+        {% if r.avviso_contanti %}<span class="warn">⚠ contanti ≥ 5.000 €</span>{% endif %}</td>
+      <td>{{ r.p.documento }}</td>
+      <td>{% if r.p.stato_consegna != 'da_definire' %}{{ r.p.get_stato_consegna_display }}{% endif %}{% if r.p.note %}<br><span class="muted">{{ r.p.note }}</span>{% endif %}</td>
+      <td class="n">{% if r.residuo > 0 %}{{ r.residuo|euro }}{% endif %}</td>
+      <td><span class="pill {% if r.stato == 'incassato' %}ok{% elif r.stato == 'parziale' %}mid{% else %}no{% endif %}">{{ r.stato }}</span></td>
+      <td class="n noprint"><a href="/admin/asta/incasso/add/?paletta={{ r.p.pk }}&importo={{ r.residuo }}">+ incasso</a> ·
+        <a href="/admin/asta/paletta/{{ r.p.pk }}/change/">modifica</a></td>
+    </tr>{% endfor %}</tbody>
+  <tfoot><tr><td>Totali</td><td class="n">{{ tot.martello|euro }}</td><td class="n">{{ tot.diritti|euro }}</td><td class="n">{{ tot.spese_spedizione|euro }}</td>
+    <td class="n">{{ tot.totale|euro }}</td><td>{{ tot.incassato|euro }} incassati</td><td></td><td></td><td class="n">{{ tot.residuo|euro }}</td><td></td><td></td></tr></tfoot>
+</table></div>
+
+<h2>IVA su diritti e spese incassati, per mese</h2>
+<p class="muted">Il calcolo che oggi si fa a mano: diritti + spese delle palette saldate nel mese, IVA {{ asta.iva_pct|floatformat:0 }}% scorporata.</p>
+<table style="max-width:640px">
+  <thead><tr><th>Mese</th><th class="n">Palette</th><th class="n">Totale IVA incl.</th><th class="n">Imponibile</th><th class="n">IVA</th></tr></thead>
+  <tbody>{% for m in iva %}<tr><td>{{ m.mese|date:"F Y" }}</td><td class="n">{{ m.palette }}</td><td class="n">{{ m.lordo|euro }}</td><td class="n">{{ m.imponibile|euro }}</td><td class="n">{{ m.iva|euro }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Nessuna paletta ancora saldata.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

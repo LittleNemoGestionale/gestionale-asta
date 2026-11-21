@@ -1,0 +1,14 @@
+{% extends "asta/base.html" %}
+{% block title %}Email paletta {{ p.numero }}{% endblock %}
+{% block doc %}
+<p><a href="{% url 'acquirenti' asta.pk %}#p{{ p.numero }}">← Acquirenti</a></p>
+<h1>Email per {{ p.acquirente.nome }}</h1>
+<div class="box" style="background:#fff">
+  <p style="margin:0"><span class="muted">A:</span> {{ p.acquirente.email|default:"(manca l'email in scheda)" }}<br>
+  <span class="muted">Oggetto:</span> <b>{{ oggetto }}</b></p>
+  <hr style="border:0;border-top:1px solid var(--line)">
+  {{ corpo|safe }}
+</div>
+<div class="azioni"><a class="btn" href="{% url 'email_eml' asta.pk p.numero %}">Apri in Outlook</a>
+  <span class="muted">Si scarica un file .eml: con doppio clic Outlook lo apre pronto da inviare.</span></div>
+{% endblock %}

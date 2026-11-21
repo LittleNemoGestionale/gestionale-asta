@@ -1,0 +1,21 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Riproponi invenduti – {{ asta.nome }}{% endblock %}
+{% block doc %}
+<h1>Riproponi invenduti · {{ asta.nome }}</h1>
+<p class="muted">Lotti invenduti o in contovendita delle aste precedenti. Quelli selezionati entrano in questa asta con un nuovo numero;
+  si può abbassare la base. Nell'asta di origine risultano «riproposti».</p>
+<form method="post">{% csrf_token %}
+<div class="scroll"><table>
+  <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.sel').forEach(c=>c.checked=this.checked)" aria-label="seleziona tutti"></th>
+    <th>Asta</th><th>Lotto</th><th>Descrizione</th><th>Mandante</th><th>Stato</th><th class="n">Riserva</th><th class="n">Nuova base €</th></tr></thead>
+  <tbody>{% for l in candidati %}
+    <tr><td><input class="sel" type="checkbox" name="lotti" value="{{ l.pk }}" id="l{{ l.pk }}"></td>
+      <td>{{ l.asta.numero|default:l.asta.nome }}</td><td><label for="l{{ l.pk }}"><b>{{ l.numero }}</b></label></td>
+      <td>{{ l.descrizione|truncatechars:70 }}</td><td>{{ l.mandato.mandante.codice }}</td><td>{{ l.get_stato_display }}</td>
+      <td class="n">{{ l.riserva|euro }}</td>
+      <td class="n"><input name="base_{{ l.pk }}" value="{{ l.base_asta|default_if_none:'' }}" style="width:90px;text-align:right" inputmode="decimal"></td></tr>
+  {% empty %}<tr><td colspan="8" class="muted">Nessun lotto invenduto da riproporre.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% if candidati %}<div class="azioni"><button class="btn">Riproponi i lotti selezionati</button><a href="{% url 'lotti_asta' asta.pk %}">Annulla</a></div>{% endif %}
+</form>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Invenduti – {{ asta.nome }}{% endblock %}
+{% block doc %}
+{% include "asta/_intestazione.html" with titolo="Lotti invenduti" %}
+<p class="muted noprint">Per cambiare lo stato (contovendita / da rendere / reso) seleziona i lotti nell'<a href="/admin/asta/lotto/?asta__id__exact={{ asta.pk }}">archivio lotti</a> e usa le azioni.</p>
+{% regroup lotti by mandato.mandante as gruppi %}
+{% for g in gruppi %}
+  <h2>{{ g.grouper.codice }}{% if perms.asta.view_dati_personali %} – {{ g.grouper.nome }}{% endif %}</h2>
+  <table>
+    <thead><tr><th>Lotto</th><th>Descrizione</th><th class="n">Riserva</th><th>Stato</th><th class="n">Prezzo c/vendita</th></tr></thead>
+    <tbody>{% for l in g.list %}
+      <tr><td>{{ l.numero }}</td><td>{{ l.etichetta|truncatechars:90 }}</td><td class="n">{{ l.riserva|euro }}</td>
+        <td><b>{{ l.get_stato_display }}</b>{% if l.data_reso %} il {{ l.data_reso|date:"d/m/Y" }}{% endif %}</td>
+        <td class="n">{{ l.prezzo_contovendita|euro }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  <p style="margin:6px 0 24px">Firma mandante per ritiro / accettazione contovendita: ______________________________</p>
+{% empty %}<p class="muted">Nessun lotto invenduto.</p>{% endfor %}
+{% endblock %}

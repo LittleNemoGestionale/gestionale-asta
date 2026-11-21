@@ -1,0 +1,60 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Mandanti – Asta {{ asta.numero }}{% endblock %}
+{% block head %}<style>
+  main { max-width:1220px }
+  .spese { font-size:12.5px; margin:4px 0 0; padding:0; list-style:none }
+  .spese li { display:flex; gap:6px; align-items:center }
+  .spese button { background:none; border:0; color:var(--accent); cursor:pointer; font-size:12px; padding:0 }
+  form.agg-spesa { display:flex; gap:4px; flex-wrap:wrap; margin-top:4px }
+  form.agg-spesa input, form.agg-spesa select { padding:3px 5px; border:1px solid var(--line); border-radius:5px; font:inherit; font-size:12.5px }
+  details summary { cursor:pointer; color:var(--accent); font-size:12.5px }
+</style>{% endblock %}
+{% block doc %}
+<h1>Mandanti · rendiconti · Asta {{ asta.numero }}</h1>
+<p class="muted">Il mandante riceve: <b>aggiudicato − diritti d'asta concordati − spese</b> (inserimento a catalogo per ogni lotto, venduto o no, più eventuali restauri o altre spese).
+  Il rendiconto in PDF si scarica o parte per email{% if invio_diretto %}, anche direttamente dal programma{% else %} con Outlook{% endif %}.</p>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+<div class="grid" style="margin:12px 0">
+  <div class="box kpi"><span class="muted">Aggiudicato</span><b>{{ tot.martello|euro }}</b></div>
+  <div class="box kpi"><span class="muted">Diritti trattenuti</span><b>{{ tot.commissione|euro }}</b></div>
+  <div class="box kpi"><span class="muted">Spese addebitate</span><b>{{ tot.spese|euro }}</b></div>
+  <div class="box kpi"><span class="muted">Da pagare ai mandanti</span><b>{{ tot.netto|euro }}</b></div>
+</div>
+<div class="azioni">
+  <a class="btn sec" href="{% url 'pdf_mandanti_tutti' asta.pk %}">⬇ Tutti i rendiconti (PDF)</a>
+  <a class="btn sec" href="{% url 'email_mandanti_tutte' asta.pk %}">✉ Tutte le email per Outlook (.zip)</a>
+  {% if invio_diretto %}<form method="post">{% csrf_token %}<button class="btn" name="azione" value="invia_tutti" onclick="return confirm('Inviare ora il rendiconto a tutti i mandanti?')">✉ Invia ora a tutti</button></form>{% endif %}
+  <a href="{% url 'pagamenti_mandanti' asta.pk %}">Pagamenti ai mandanti →</a>
+</div>
+
+<div class="scroll"><table>
+  <thead><tr><th>Mandante</th><th class="n">Lotti</th><th class="n">Aggiudicato</th><th class="n">Diritti</th><th>Spese</th><th class="n">Riceve</th><th class="n">Pagato</th><th>Rendiconto</th></tr></thead>
+  <tbody>{% for x in righe %}
+    <tr id="m{{ x.m.pk }}">
+      <td><a href="{% url 'scheda' x.m.pk %}"><b>{{ x.m.nome }}</b></a><br><span class="muted" style="font-size:12px">cod. {{ x.m.codice }} · mandat{{ x.mandati|length|pluralize:"o,i" }} {% for md in x.mandati %}{{ md.numero }} ({{ md.commissione_pct|floatformat:0 }}%){% if not forloop.last %}, {% endif %}{% endfor %}</span>
+        {% if not x.m.email %}<br><span class="warn" style="font-size:12px">manca l'email</span>{% endif %}{% if not x.m.iban %}<br><span class="warn" style="font-size:12px">manca l'IBAN</span>{% endif %}</td>
+      <td class="n">{{ x.n_venduti }} / {{ x.n_lotti }}<br><span class="muted" style="font-size:11px">venduti / inseriti</span></td>
+      <td class="n">{{ x.r.totali.martello|euro }}</td>
+      <td class="n">{{ x.r.totali.commissione|euro }}{% if x.r.totali.iva_commissione %}<br><span class="muted" style="font-size:12px">+ IVA {{ x.r.totali.iva_commissione|euro }}</span>{% endif %}</td>
+      <td>{{ x.r.totali.spese|euro }}
+        <ul class="spese">{% for i in x.r.inserimenti %}<li>inserimento {{ i.n }} × {{ i.unitario|euro }}</li>{% endfor %}
+          {% for s in x.r.spese %}<li>{{ s.descrizione }} {{ s.importo|euro }}
+            <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="azione" value="togli_spesa"><input type="hidden" name="spesa" value="{{ s.pk }}"><button title="togli">✕</button></form></li>{% endfor %}</ul>
+        <details><summary>+ aggiungi spesa</summary>
+          <form method="post" class="agg-spesa">{% csrf_token %}<input type="hidden" name="azione" value="spesa">
+            {% if x.mandati|length > 1 %}<select name="mandato" aria-label="mandato">{% for md in x.mandati %}<option value="{{ md.pk }}">{{ md.numero }}</option>{% endfor %}</select>{% else %}<input type="hidden" name="mandato" value="{{ x.mandati.0.pk }}">{% endif %}
+            <input name="descrizione" placeholder="es. Spese piccolo restauro" required style="width:170px" aria-label="descrizione spesa">
+            <input name="importo" placeholder="€" required inputmode="decimal" style="width:60px" aria-label="importo">
+            <button class="btn sec" style="padding:2px 8px">Aggiungi</button></form></details></td>
+      <td class="n"><b>{{ x.r.totali.netto|euro }}</b></td>
+      <td class="n">{% if x.pagato %}{{ x.pagato|euro }}{% if x.residuo > 0 %}<br><span class="warn" style="font-size:12px">resta {{ x.residuo|euro }}</span>{% else %}<br><span class="pill ok">pagato</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td style="white-space:nowrap"><a href="{% url 'pdf_mandante' asta.pk x.m.pk %}">PDF</a> · <a href="{% url 'email_mandante' asta.pk x.m.pk %}">Email</a> · <a href="{% url 'eml_mandante' asta.pk x.m.pk %}">Outlook</a>
+        {% if invio_diretto and x.m.email %}<form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="mandante" value="{{ x.m.pk }}"> · <button name="azione" value="invia" style="background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0">Invia</button></form>{% endif %}
+        {% if x.rif %}<br><span class="muted" style="font-size:11.5px">rif. {{ x.rif.numero }}/{{ x.rif.anno }}</span>{% endif %}
+        {% if x.rif.email_inviata_il %}<br><span class="pill ok">inviato {{ x.rif.email_inviata_il|date:"d/m H:i" }}</span>{% elif x.rif.email_preparata_il %}<br><span class="pill mid">preparato {{ x.rif.email_preparata_il|date:"d/m" }}</span>{% endif %}</td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="muted">Nessun mandante con lotti in questa asta.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="muted">Le spese di inserimento (10 € a lotto) si possono cambiare per ogni mandato, se l'accordo è diverso. Il numero di riferimento del rendiconto è assegnato la prima volta che lo si scarica o invia.</p>
+{% endblock %}

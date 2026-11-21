@@ -1,0 +1,5 @@
+<div class="doc-head">
+  <div><div class="casa">{{ casa_asta_nome }}</div><div class="muted">{{ asta.nome }} · {{ asta.data|date:"d/m/Y" }}</div></div>
+  <div style="text-align:right"><b>{{ titolo }}</b><br><span class="muted">Stampato il {% now "d/m/Y H:i" %}</span></div>
+</div>
+<button class="btn sec print" onclick="window.print()">Stampa / PDF</button>

@@ -1,0 +1,31 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Pagamenti mandanti – {{ asta.nome }}{% endblock %}
+{% block doc %}
+<h1>Pagamenti ai mandanti · {{ asta.nome }}</h1>
+<p><a class="btn sec" href="{% url 'excel_contabilita' asta.pk 'mandanti' %}">⬇ Excel pagamenti per la contabile</a></p>
+<div class="grid">
+  <div class="box kpi"><span class="muted">Dobbiamo pagare</span><b>{{ tot.dovuto|euro }}</b></div>
+  <div class="box kpi"><span class="muted">Già pagato</span><b>{{ tot.pagato|euro }}</b></div>
+  <div class="box kpi"><span class="muted">Ancora da pagare</span><b>{{ tot.residuo|euro }}</b></div>
+  <div class="box kpi"><span class="muted">Pagabile subito*</span><b>{{ tot.pagabile|euro }}</b></div>
+</div>
+<div class="scroll"><table>
+  <thead><tr><th>Mandante</th><th>Mandato</th><th class="n">Lotti</th><th class="n">Dovuto</th><th>Pagamenti</th><th class="n">Residuo</th><th class="n">Pagabile*</th><th>Stato</th><th></th></tr></thead>
+  <tbody>{% for r in righe %}
+    <tr class="{% if r.stato == 'pagato' %}ok{% elif r.stato == 'acconto' %}mid{% endif %}">
+      <td><b>{{ r.mandante.codice }}</b>{% if perms.asta.view_dati_personali %}<br><span class="muted">{{ r.mandante.nome }}</span>{% endif %}</td>
+      <td>{{ r.mandato.numero }} <span class="muted">({{ r.mandato.commissione_pct|floatformat:0 }}%)</span></td>
+      <td class="n">{{ r.lotti_venduti }}</td>
+      <td class="n"><b>{{ r.dovuto|euro }}</b></td>
+      <td>{% for p in r.pagamenti %}{{ p.metodo.sigla }} {{ p.importo|euro }} <span class="muted">{{ p.data|date:"d/m" }}{% if p.numero_documento %} · {{ p.numero_documento }}{% endif %}</span><br>{% empty %}<span class="muted">—</span>{% endfor %}
+        {% if r.iban_mancante %}<span class="warn">⚠ IBAN mancante</span>{% endif %}</td>
+      <td class="n">{% if r.residuo > 0 %}{{ r.residuo|euro }}{% endif %}</td>
+      <td class="n">{% if r.residuo > 0 %}{{ r.pagabile|euro }}{% endif %}</td>
+      <td><span class="pill {% if r.stato == 'pagato' %}ok{% elif r.stato == 'acconto' %}mid{% else %}no{% endif %}">{{ r.stato }}</span></td>
+      <td class="n noprint">{% if r.residuo > 0 %}<a href="/admin/asta/pagamentomandante/add/?asta={{ asta.pk }}&mandato={{ r.mandato.pk }}&importo={{ r.pagabile }}">+ pagamento</a> · {% endif %}
+        {% if perms.asta.view_dati_personali %}<a href="{% url 'doc_rendiconto' asta.pk r.mandante.pk %}">rendiconto</a>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  <tfoot><tr><td colspan="3">Totali</td><td class="n">{{ tot.dovuto|euro }}</td><td>{{ tot.pagato|euro }} pagati</td><td class="n">{{ tot.residuo|euro }}</td><td class="n">{{ tot.pagabile|euro }}</td><td></td><td></td></tr></tfoot>
+</table></div>
+<p class="muted">* Pagabile subito = netto dei lotti il cui acquirente ha già saldato, meno quanto già pagato al mandante.</p>
+{% endblock %}

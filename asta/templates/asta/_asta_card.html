@@ -1,0 +1,6 @@
+{% load euro %}<a class="asta-card" href="{% if a.stato == 'futura' %}{% url 'lotti_asta' a.pk %}{% else %}{% url 'asta_cruscotto' a.pk %}{% endif %}">
+  <span class="num">{% if a.numero %}Asta {{ a.numero }} · {% endif %}{{ a.data|date:"d/m/Y" }}</span>
+  <h3>{{ a.nome }}</h3>
+  <span class="muted">{{ a.n_lotti }} lotti{% if a.stato != 'futura' %} · {{ a.n_aggiudicati }} venduti · {{ a.totale|euro }}{% endif %}</span>
+  <span><span class="pill {% if a.stato == 'futura' %}mid{% else %}ok{% endif %}">{{ a.stato }}</span></span>
+</a>

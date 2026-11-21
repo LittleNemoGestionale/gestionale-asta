@@ -1,0 +1,11 @@
+!asta/**/*.xlsx
+*.pyc
+*.xlsx
+*.zip
+.env
+__pycache__/
+dati/
+db.sqlite3
+docs/esempio-backup/
+static_raccolti/
+venv/

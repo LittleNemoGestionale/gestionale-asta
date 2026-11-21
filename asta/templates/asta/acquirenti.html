@@ -1,0 +1,64 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Acquirenti – Asta {{ asta.numero }}{% endblock %}
+{% block head %}<style>
+  main { max-width:1200px }
+  .filtri a { padding:5px 12px; border:1px solid var(--line); border-radius:18px; text-decoration:none; color:var(--ink); background:#fff; font-size:13.5px }
+  .filtri a.on { background:var(--accent); color:#fff; border-color:var(--accent) }
+  td select, td input { padding:5px 6px; border:1px solid var(--line); border-radius:6px; font:inherit; font-size:13.5px; background:#fff }
+  tr.deciso td { background:#f6fbf7 }
+  .ind { font-size:12.5px; color:var(--muted) }
+  .prop { font-size:11.5px; color:#1d4c9b }
+</style>{% endblock %}
+{% block doc %}
+<h1>Acquirenti · Asta {{ asta.numero }}</h1>
+<p class="muted">Chi ha comprato e quanto deve pagare. Per ogni paletta: il <b>conteggio delle aggiudicazioni</b> in PDF, la <b>consegna</b> (il costo si propone da solo e si può cambiare) e l'<b>email</b> che si apre in Outlook già compilata, con il PDF allegato.</p>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+{% if manca_iban %}<div class="msg info">Per le email manca l'IBAN della casa d'aste: va indicato in <code>dati/impostazioni.ini</code> (CASA_ASTA_IBAN, CASA_ASTA_EMAIL, CASA_ASTA_FIRMA).</div>{% endif %}
+
+<div class="azioni" style="justify-content:space-between">
+  <div class="filtri azioni" style="margin:0">
+    <a href="?" class="{% if not filtro %}on{% endif %}">Tutti ({{ n_tot }})</a>
+    <a href="?filtro=da_decidere" class="{% if filtro == 'da_decidere' %}on{% endif %}">Consegna da decidere ({{ n_da_decidere }})</a>
+    <a href="?filtro=da_pagare" class="{% if filtro == 'da_pagare' %}on{% endif %}">Devono ancora pagare ({{ n_da_pagare }})</a>
+    <a href="?filtro=email" class="{% if filtro == 'email' %}on{% endif %}">Email da preparare</a>
+  </div>
+  <span class="azioni" style="margin:0"><a class="btn sec" href="{% url 'pdf_conteggi' asta.pk %}{% if filtro == 'da_pagare' %}?filtro=da_pagare{% endif %}">⬇ Conteggi di tutte le palette (PDF)</a>
+  <a class="btn" href="{% url 'email_tutte' asta.pk %}">✉ Prepara tutte le email pronte (.zip)</a>
+  {% if invio_diretto %}<form method="post">{% csrf_token %}<button class="btn" name="azione" value="invia_tutte" onclick="return confirm('Inviare ora le email a tutti gli acquirenti con la consegna decisa e non ancora avvisati?')">✉ Invia ora</button></form>{% endif %}</span>
+</div>
+<p class="muted">{{ n_decise }} su {{ n_tot }} con la consegna decisa · {{ n_email }} email preparate.</p>
+
+<div class="scroll"><table>
+  <thead><tr><th>Paletta</th><th>Acquirente</th><th class="n">Lotti</th><th class="n">Aggiud. + diritti</th><th>Consegna e costo</th><th class="n">Totale</th><th>Conteggio</th><th>Email</th></tr></thead>
+  <tbody>{% for r in righe %}
+    <tr id="p{{ r.p.numero }}" class="{% if r.p.modalita %}deciso{% endif %}">
+      <td><b style="font-size:16px">{{ r.p.numero }}</b><br><span class="muted" style="font-size:12px">{{ r.p.canale }}</span></td>
+      <td><a href="{% url 'scheda' r.p.acquirente.pk %}">{{ r.p.acquirente.nome }}</a>
+        <div class="ind">{% if r.ind %}{{ r.ind.citta }}{% if r.ind.provincia %} ({{ r.ind.provincia }}){% endif %} · {{ r.ind.nazione }}{% else %}<span class="warn">senza indirizzo</span>{% endif %}</div></td>
+      <td class="n">{{ r.n_lotti }}</td>
+      <td class="n">{{ r.s.martello|add:r.s.diritti|euro }}</td>
+      <td><form method="post" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">{% csrf_token %}<input type="hidden" name="paletta" value="{{ r.p.pk }}">
+          <select name="modalita" class="mod" aria-label="consegna paletta {{ r.p.numero }}">
+            <option value="">— da decidere —</option>
+            {% for m in modalita %}<option value="{{ m.pk }}" data-costo="{{ m.costo }}" {% if r.proposta and r.proposta.pk == m.pk %}selected{% endif %}>{{ m.nome }}</option>{% endfor %}</select>
+          <input name="spese" class="spese" value="{% if r.p.modalita %}{{ r.p.spese_spedizione }}{% elif r.proposta %}{{ r.proposta.costo }}{% endif %}" placeholder="€" inputmode="decimal" style="width:72px" aria-label="costo">
+          <button class="btn sec" style="padding:4px 10px">Salva</button></form>
+        {% if not r.p.modalita and r.proposta %}<div class="prop">proposta in base all'indirizzo: non ancora salvata</div>{% endif %}</td>
+      <td class="n"><b>{{ r.s.totale|euro }}</b>{% if r.s.residuo > 0 %}<br><span class="warn" style="font-size:12px">da pagare {{ r.s.residuo|euro }}</span>{% else %}<br><span class="pill ok">pagato</span>{% endif %}</td>
+      <td><a href="{% url 'pdf_conteggio' asta.pk r.p.numero %}">PDF</a></td>
+      <td>{% if r.p.modalita %}
+          <a href="{% url 'email_anteprima' asta.pk r.p.numero %}">Vedi</a> ·
+          <a href="{% url 'email_eml' asta.pk r.p.numero %}">Apri in Outlook</a>
+          {% if invio_diretto and r.email %}<form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="paletta" value="{{ r.p.pk }}"> · <button name="azione" value="invia" style="background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0">Invia</button></form>{% endif %}
+          {% if r.p.email_preparata_il %}<br><span class="pill ok">preparata {{ r.p.email_preparata_il|date:"d/m H:i" }}</span>{% endif %}
+          {% if not r.email %}<br><span class="warn" style="font-size:12px">manca l'email in scheda</span>{% endif %}
+        {% else %}<span class="muted" style="font-size:12.5px">prima scegli la consegna</span>{% endif %}</td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="muted">Nessun acquirente{% if filtro %} in questo filtro{% endif %}.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="muted">«Apri in Outlook» scarica un file .eml: con doppio clic Outlook lo apre come nuovo messaggio già compilato, con destinatario, oggetto e riepilogo.</p>
+<script>
+document.querySelectorAll('select.mod').forEach(function(s){ s.addEventListener('change', function(){
+  var o = s.options[s.selectedIndex], sp = s.closest('form').querySelector('.spese'); sp.value = o.dataset.costo || ''; }); });
+</script>
+{% endblock %}

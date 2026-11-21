@@ -1,0 +1,12 @@
+{% extends "asta/base.html" %}
+{% block title %}Email rendiconto{% endblock %}
+{% block doc %}
+<p><a href="{% url 'mandanti' asta.pk %}#m{{ m.pk }}">← Mandanti</a></p>
+<h1>Email per {{ m.nome }}</h1>
+<div class="box" style="background:#fff">
+  <p style="margin:0"><span class="muted">A:</span> {{ m.email|default:"(manca l'email in scheda)" }}<br>
+  <span class="muted">Oggetto:</span> <b>{{ oggetto }}</b><br><span class="muted">Allegato:</span> rendiconto in PDF</p>
+  <hr style="border:0;border-top:1px solid var(--line)">{{ corpo|safe }}
+</div>
+<div class="azioni"><a class="btn" href="{% url 'eml_mandante' asta.pk m.pk %}">Apri in Outlook</a> <a class="btn sec" href="{% url 'pdf_mandante' asta.pk m.pk %}">Vedi il PDF</a></div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Lotti – {{ asta.nome }}{% endblock %}
+{% block doc %}
+<h1>Lotti · {{ asta.nome }}</h1>
+<p class="muted">{{ asta.data|date:"d/m/Y" }}{% if asta.data_fine and asta.data_fine != asta.data %} – {{ asta.data_fine|date:"d/m/Y" }}{% endif %} · {{ asta.numero_tornate }} tornat{{ asta.numero_tornate|pluralize:"a,e" }} · {{ lotti|length }} lotti · <span class="pill {% if asta.stato == 'futura' %}mid{% else %}ok{% endif %}">{{ asta.stato }}</span></p>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+{% if puo and not asta.chiusa %}
+<div class="azioni">
+  <a class="btn sec" href="{% url 'importa_lotti' asta.pk %}?nuovo=1">⬆ Carica il catalogo (Word o Excel)</a>
+  <a class="btn sec" href="{% url 'riproponi' asta.pk %}">↻ Riproponi invenduti di aste precedenti</a>
+  <a class="btn" href="{% url 'faldone' asta.pk %}">⬇ Scarica il faldone</a>
+</div>
+
+<h2>Aggiungi un lotto</h2>
+<form method="post" class="campi box">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="largo">{{ form.non_field_errors }}</div>{% endif %}
+  <div><label for="id_numero">Lotto</label>{{ form.numero }}</div>
+  <div><label for="id_tornata">Tornata</label>{{ form.tornata }}<div class="aiuto">su {{ asta.numero_tornate }}</div></div>
+  <div><label for="id_mandato">Mandato</label>
+    <input name="mandato" id="id_mandato" list="elenco-mandati" required autocomplete="off" value="{{ form.mandato.value|default:'' }}" placeholder="es. 12 o 2026/003">
+    <datalist id="elenco-mandati">{% for m in mandati %}<option value="{{ m.numero }}">{{ m.mandante.codice }}{% if perms.asta.view_dati_personali %} – {{ m.mandante.nome }}{% endif %} · {{ m.commissione_pct|floatformat:0 }}%</option>{% endfor %}</datalist>
+    <div class="aiuto">codice mandante o numero mandato</div></div>
+  <div><label for="id_stima_min">Stima min €</label>{{ form.stima_min }}</div>
+  <div><label for="id_stima_max">Stima max €</label>{{ form.stima_max }}</div>
+  <div><label for="id_base_asta">Base €</label>{{ form.base_asta }}</div>
+  <div><label for="id_riserva">Riserva €</label>{{ form.riserva }}</div>
+  <div><label for="id_commissione_pct">Commissione %</label>{{ form.commissione_pct }}<div class="aiuto">vuoto = quella del mandato</div></div>
+  <div class="largo"><label for="id_descrizione">Descrizione</label>{{ form.descrizione }}</div>
+  <div class="largo"><button class="btn">Aggiungi lotto ⏎</button></div>
+</form>
+{% endif %}
+
+<div class="azioni" style="justify-content:space-between"><h2 style="margin:0">Catalogo</h2>
+  <span>{% if n_foto %}{% if solo_foto %}<a href="?">Mostra tutti</a>{% else %}<a href="?foto=1">{{ n_foto }} da fotografare</a>{% endif %}{% endif %}
+  {% if not puo or asta.chiusa %} · <a href="{% url 'faldone' asta.pk %}">Scarica il faldone</a>{% endif %}</span></div>
+<div class="scroll"><table>
+  <thead><tr><th>Lotto</th>{% if asta.numero_tornate > 1 %}<th>Tornata</th>{% endif %}<th>Descrizione</th><th>Mandante</th><th class="n">Base</th><th class="n">Stima</th><th class="n">Riserva</th><th class="n">Comm.</th><th>Stato</th><th></th></tr></thead>
+  <tbody>{% for l in lotti %}
+    <tr><td><b>{{ l.numero }}</b></td>{% if asta.numero_tornate > 1 %}<td>{{ l.tornata|default:"" }}</td>{% endif %}
+      <td>{% ifchanged l.sezione %}{% if l.sezione %}<span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">{{ l.sezione }}</span><br>{% endif %}{% endifchanged %}
+        {% if l.titolo %}<b>{{ l.titolo }}</b>{% if l.illustratore %} <span class="muted">· {{ l.illustratore }}</span>{% endif %}<br><span class="muted" style="font-size:12.5px">{{ l.descrizione|truncatechars:90 }}</span>{% else %}{{ l.descrizione|truncatechars:80 }}{% endif %}
+        {% if l.note_interne %}<br><i class="muted" style="font-size:12px">{{ l.note_interne }}</i>{% endif %}{% if l.da_fotografare %} <span style="font-size:11px;background:#e7eefb;color:#1d4c9b;padding:1px 6px;border-radius:8px">da fotografare</span>{% endif %}{% if l.lotto_origine %}<br><span class="muted">riproposto dall'asta {{ l.lotto_origine.asta.numero|default:l.lotto_origine.asta.nome }}, lotto {{ l.lotto_origine.numero }}</span>{% endif %}</td>
+      <td>{{ l.mandato.mandante.codice }} <span class="muted">{{ l.mandato.numero }}</span></td>
+      <td class="n">{{ l.base_asta|euro }}</td>
+      <td class="n">{% if l.stima_min %}{{ l.stima_min|euro }} – {% endif %}{{ l.stima_max|euro }}</td><td class="n">{{ l.riserva|euro }}</td>
+      <td class="n">{{ l.commissione_effettiva|floatformat:0 }}%</td>
+      <td>{{ l.get_stato_display }}</td>
+      <td class="n noprint">{% if puo %}<a href="/admin/asta/lotto/{{ l.pk }}/change/">modifica</a>{% if l.stato == 'in_asta' %}
+        <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="azione" value="elimina"><input type="hidden" name="lotto" value="{{ l.pk }}">
+          · <button style="background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0" onclick="return confirm('Eliminare il lotto {{ l.numero }}?')">elimina</button></form>{% endif %}{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="9" class="muted">Nessun lotto. Aggiungili qui sopra, da Excel, o riproponi gli invenduti.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

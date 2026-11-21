@@ -1,0 +1,20 @@
+{% extends "asta/base.html" %}
+{% block title %}Spedizione paletta {{ p.numero }}{% endblock %}
+{% block doc %}
+{% include "asta/_intestazione.html" with titolo="Scheda di spedizione" %}
+<div class="grid">
+  <div class="box"><span class="muted">Paletta</span><br><b style="font-size:42px">{{ p.numero }}</b><br>Cliente {{ p.acquirente.codice }}</div>
+  <div class="box" style="grid-column:span 2"><span class="muted">Spedire a</span><br>
+    {% if p.indirizzo_spedizione %}<div style="font-size:18px">{% for r in p.indirizzo_spedizione.righe %}{{ r }}<br>{% endfor %}</div>
+      {% if p.indirizzo_spedizione.note_consegna %}<p><i>{{ p.indirizzo_spedizione.note_consegna }}</i></p>{% endif %}
+    {% else %}<b style="font-size:18px">RITIRO IN SEDE</b>{% endif %}</div>
+</div>
+<h2>Lotti da imballare ({{ lotti|length }})</h2>
+<table>
+  <thead><tr><th style="width:30px">✓</th><th>Lotto</th><th>Descrizione</th><th>Mandante</th></tr></thead>
+  <tbody>{% for l in lotti %}
+    <tr><td>☐</td><td><b>{{ l.numero }}</b></td><td>{{ l.descrizione }}</td><td>{{ l.mandato.mandante.codice }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+<p style="margin-top:40px">Imballato da: ______________________ &nbsp; Data: ____________ &nbsp; N. colli: ______ &nbsp; Tracking: ______________________</p>
+{% endblock %}

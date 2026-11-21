@@ -1,0 +1,44 @@
+{% extends "asta/base.html" %}
+{% block title %}{% if modifica %}Modifica asta{% else %}Nuova asta{% endif %}{% endblock %}
+{% block doc %}
+<h1>{% if modifica %}Modifica asta {{ asta.numero|default:"" }}{% else %}Apri una nuova asta{% endif %}</h1>
+<p class="muted">{% if not modifica %}Numero, tema, giorni dell'asta e tornate (gli orari si indicano per ogni tornata). Diritti e IVA partono da quelli dell'ultima asta.{% endif %}</p>
+<form method="post" class="campi box">{% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for f in form %}
+    <div class="{% if f.name == 'nome' or f.name == 'note' %}largo{% endif %}{% if f.name == 'luogo' %} sep{% endif %}">
+      {% if f.field.widget.input_type == 'checkbox' %}<label>{{ f }} {{ f.label }}</label>{% else %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% endif %}
+      {% if f.help_text %}<div class="aiuto">{{ f.help_text }}</div>{% endif %}{{ f.errors }}
+    </div>
+  {% endfor %}
+  <div class="largo">
+    <label>Fasce di palette</label>
+    <div class="aiuto" style="margin-bottom:6px">Quali numeri di paletta si danno a chi partecipa in sala, al telefono, con offerte scritte, online o nel post asta. Diritti vuoti = quelli dell'asta.</div>
+    <div class="scroll"><table style="max-width:620px;margin:0">
+      <thead><tr><th>Chi</th><th>Dal n.</th><th>Al n.</th><th>Diritti %</th></tr></thead>
+      <tbody>{% for i, f in righe_fasce %}<tr>
+        <td><select name="fascia_{{ i }}_tipo" aria-label="tipo fascia {{ i }}"><option value="">—</option>{% for v, n in tipi_fascia %}<option value="{{ v }}" {% if f.0 == v %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></td>
+        <td><input name="fascia_{{ i }}_da" value="{{ f.1 }}" inputmode="numeric" style="width:80px" aria-label="dal numero"></td>
+        <td><input name="fascia_{{ i }}_a" value="{{ f.2 }}" inputmode="numeric" style="width:80px" aria-label="al numero"></td>
+        <td><input name="fascia_{{ i }}_pct" value="{{ f.3|default_if_none:'' }}" inputmode="decimal" style="width:80px" aria-label="diritti"></td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+  <div class="largo" id="orari-tornate">
+    <label>Orari delle tornate</label>
+    <div class="aiuto" style="margin-bottom:6px">Servono per le righe «FINE PRIMA TORNATA – INIZIO SECONDA TORNATA ORE …» nel faldone.</div>
+    {% for n, t in righe_tornate %}
+    <div class="riga-tornata" data-n="{{ n }}" style="display:flex;gap:10px;align-items:center;margin:4px 0">
+      <b style="width:90px">Tornata {{ n }}</b>
+      <input type="date" name="tornata_{{ n }}_data" value="{{ t.data|date:'Y-m-d' }}" style="max-width:180px" aria-label="giorno tornata {{ n }}">
+      <input type="time" name="tornata_{{ n }}_ora" value="{{ t.ora|time:'H:i' }}" style="max-width:130px" aria-label="ora tornata {{ n }}">
+    </div>{% endfor %}
+  </div>
+  <script>
+  (function(){ var n=document.getElementById('id_numero_tornate');
+    function agg(){ var v=parseInt(n.value||'1',10); document.querySelectorAll('.riga-tornata').forEach(function(r){ r.hidden = parseInt(r.dataset.n,10) > v; }); }
+    n.addEventListener('input',agg); agg(); })();
+  </script>
+  <div class="largo azioni"><button class="btn">{% if modifica %}Salva{% else %}Apri l'asta e carica i lotti →{% endif %}</button>
+    <a href="{% if modifica %}{% url 'asta_cruscotto' asta.pk %}{% else %}{% url 'aste' %}{% endif %}">Annulla</a></div>
+</form>
+{% endblock %}

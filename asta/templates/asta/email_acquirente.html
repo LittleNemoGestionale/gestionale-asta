@@ -1,0 +1,23 @@
+{% load euro %}<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5;max-width:640px">
+<p>Gentile {{ p.acquirente.nome }},</p>
+<p>La ringraziamo per aver partecipato all'<b>asta {{ asta.numero }} «{{ asta.nome }}»</b> del {{ asta.data|date:"j F Y" }}. Ecco il riepilogo dei lotti che Le sono stati aggiudicati con la paletta <b>{{ p.numero }}</b>:</p>
+<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px;width:100%">
+  <tr style="background:#f2f2f2"><th align="left">Lotto</th><th align="left">Descrizione</th><th align="right">Aggiudicazione</th></tr>
+  {% for a in s.aggiudicazioni %}<tr style="border-bottom:1px solid #ddd"><td>{{ a.lotto.numero }}</td><td>{{ a.lotto.etichetta|truncatechars:80 }}</td><td align="right">{{ a.prezzo_martello|euro }}</td></tr>{% endfor %}
+</table>
+<table cellpadding="4" cellspacing="0" style="font-size:14px;margin:12px 0 0 auto">
+  <tr><td>Totale aggiudicazioni</td><td align="right">{{ s.martello|euro }}</td></tr>
+  <tr><td>Diritti d'asta {{ p.diritti_effettivi|floatformat:0 }}%{% if asta.diritti_iva_inclusa %} (IVA inclusa){% endif %}</td><td align="right">{{ s.diritti|euro }}</td></tr>
+  {% if not asta.diritti_iva_inclusa %}<tr><td>IVA sui diritti</td><td align="right">{{ s.iva_diritti|euro }}</td></tr>{% endif %}
+  <tr><td>{{ p.modalita.nome }}</td><td align="right">{{ s.spese_spedizione|euro }}</td></tr>
+  {% if s.abbuono %}<tr><td>Abbuono</td><td align="right">−{{ s.abbuono|euro }}</td></tr>{% endif %}
+  <tr><td><b>Totale</b></td><td align="right"><b>{{ s.totale|euro }}</b></td></tr>
+  {% if s.incassato %}<tr><td>Già versato</td><td align="right">{{ s.incassato|euro }}</td></tr>
+  <tr><td><b>Resta da pagare</b></td><td align="right"><b>{{ s.residuo|euro }}</b></td></tr>{% endif %}
+</table>
+{% if s.residuo > 0 %}<p><b>Pagamento</b>: bonifico bancario{% if iban %} sul conto <b>{{ iban }}</b> intestato a {{ intestatario }}{% endif %}, causale «Asta {{ asta.numero }} – paletta {{ p.numero }}».</p>{% else %}<p>Il pagamento risulta già completo: grazie.</p>{% endif %}
+{% if p.modalita.testo_email %}<p>{{ p.modalita.testo_email }}</p>{% endif %}
+{% if indirizzo %}<p><b>Indirizzo di spedizione</b>:<br>{% for r in indirizzo.righe %}{{ r }}<br>{% endfor %}Se è cambiato, ce lo comunichi rispondendo a questa email.</p>{% endif %}
+<p>Restiamo a disposizione per qualsiasi chiarimento.</p>
+<p>Cordiali saluti,<br>{{ firma|linebreaksbr }}</p>
+</div>

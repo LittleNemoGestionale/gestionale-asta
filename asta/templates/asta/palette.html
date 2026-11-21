@@ -1,0 +1,46 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Palette – Asta {{ asta.numero }}{% endblock %}
+{% block doc %}
+<div class="azioni" style="justify-content:space-between"><h1 style="margin:0">Palette · Asta {{ asta.numero }}</h1>
+  <form method="get"><select name="asta" onchange="this.form.submit()" style="padding:7px;border:1px solid var(--line);border-radius:6px;font:inherit">
+    {% for a in aste %}<option value="{{ a.pk }}" {% if a.pk == asta.pk %}selected{% endif %}>Asta {{ a.numero }} · {{ a.nome }} ({{ a.data|date:"d/m" }})</option>{% endfor %}</select></form></div>
+<p class="muted">{{ asta.nome }} · {{ asta.data|date:"d/m/Y" }} · {{ elenco|length }} palette assegnate</p>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+{% if puo and not asta.chiusa %}
+<h2>Assegna una paletta</h2>
+<form method="post" class="campi box">{% csrf_token %}
+  <div class="largo"><label for="cliente-cerca">Cliente</label>
+    <input id="cliente-cerca" list="elenco-clienti" placeholder="Scrivi nome o codice…" autocomplete="off" value="{% if cliente %}{{ cliente.codice }} – {{ cliente.nome }}{% endif %}" required>
+    <input type="hidden" name="cliente" id="cliente-id" value="{{ cliente.pk|default:'' }}">
+    <datalist id="elenco-clienti">{% for c in clienti %}<option data-id="{{ c.pk }}" value="{{ c.codice }} – {{ c.nome }}">{% endfor %}</datalist>
+    <div class="aiuto">Non c'è? <a href="{% url 'scheda_nuova' %}?ritorno={{ request.path|urlencode }}%3Fasta%3D{{ asta.pk }}">Crea una nuova scheda cliente</a> e torni qui.</div></div>
+  <div class="largo"><label>Come partecipa</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">{% for v, nome, prossimo, fasce in canali %}
+      <label style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:#fff">
+        <input type="radio" name="canale" value="{{ v }}" data-prossimo="{{ prossimo|default:'' }}" style="width:auto" {% if forloop.first %}checked{% endif %}>
+        {{ nome }} <span class="muted">({% for f in fasce %}{{ f.da }}–{{ f.a }}{% if not forloop.last %}, {% endif %}{% endfor %})</span></label>{% endfor %}</div></div>
+  <div><label for="numero">Numero paletta</label><input id="numero" name="numero" value="{{ num_sala|default:'' }}" inputmode="numeric" required>
+    <div class="aiuto">Proposto il primo libero del canale scelto; si può cambiare.</div></div>
+  <script>document.querySelectorAll('input[name=canale]').forEach(function(r){ r.addEventListener('change', function(){ document.getElementById('numero').value = r.dataset.prossimo; }); });
+    (function(){ var c=document.querySelector('input[name=canale]:checked'); if(c && c.dataset.prossimo) document.getElementById('numero').value=c.dataset.prossimo; })();</script>
+  <div class="largo"><button class="btn">Assegna paletta</button></div>
+</form>
+<script>
+(function(){ var i=document.getElementById('cliente-cerca'), h=document.getElementById('cliente-id');
+  i.addEventListener('input',function(){ var o=[].find.call(document.querySelectorAll('#elenco-clienti option'),function(x){return x.value===i.value}); h.value=o?o.dataset.id:''; }); })();
+</script>
+{% endif %}
+
+<h2>Palette assegnate</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Paletta</th><th>Cliente</th><th>Canale</th><th>Diritti</th><th></th></tr></thead>
+  <tbody>{% for p in elenco %}
+    <tr id="p{{ p.numero }}"><td><b style="font-size:16px">{{ p.numero }}</b></td>
+      <td>{% if perms.asta.view_dati_personali %}<a href="{% url 'scheda' p.acquirente.pk %}">{{ p.acquirente.nome }}</a>{% endif %} <span class="muted">cod. {{ p.acquirente.codice }}</span></td>
+      <td>{{ p.canale }}</td>
+      <td>{{ p.diritti_effettivi|floatformat:0 }}%</td>
+      <td class="n"><a href="/admin/asta/paletta/{{ p.pk }}/change/">modifica</a></td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Nessuna paletta assegnata.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Carica catalogo – Asta {{ asta.numero }}{% endblock %}
+{% block head %}<style>
+  .sez td { background:var(--soft); font-weight:600; letter-spacing:.03em; font-size:12px; text-transform:uppercase; color:var(--accent) }
+  tr.escluso td { color:#9a9a9a; text-decoration:line-through }
+  .tit { font-weight:600 } .desc { color:var(--muted); font-size:12.5px }
+  .abbina { display:grid; grid-template-columns:minmax(140px,220px) 1fr; gap:8px 14px; align-items:center }
+  .abbina select, .tornate input { padding:6px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; max-width:100% }
+  .tornate { display:flex; flex-wrap:wrap; gap:14px; align-items:center }
+  .tornate input { width:80px }
+  .foto { font-size:11px; background:#e7eefb; color:#1d4c9b; padding:1px 6px; border-radius:8px; white-space:nowrap }
+</style>{% endblock %}
+{% block doc %}
+<p><a href="{% url 'lotti_asta' asta.pk %}">← Lotti dell'asta {{ asta.numero }}</a></p>
+<h1>Carica il catalogo · Asta {{ asta.numero }}</h1>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+{% if not dati %}
+<p>Carica il <b>catalogo Word</b> (le schede come le scrivete oggi) oppure un <b>faldone</b> o un <b>Excel</b> con i lotti.
+  Prima di salvare vedrai un'anteprima: niente viene registrato finché non confermi.</p>
+<form method="post" enctype="multipart/form-data" class="box azioni">{% csrf_token %}
+  <input type="file" name="file" accept=".docx,.xlsx" required> <button class="btn">Leggi il file</button>
+</form>
+<div class="box" style="margin-top:14px">
+  <b>Come viene letto il catalogo Word</b>
+  <ul style="margin:6px 0 0;padding-left:20px">
+    <li><b>Titoli in MAIUSCOLO grassetto</b> → sezioni del catalogo (es. HORROR). Le sezioni «DA INSERIRE» e «PROSSIME ASTE» vengono saltate.</li>
+    <li><b>«00. Titolo»</b> → nuovo lotto; i lotti con 00 vengono numerati in ordine.</li>
+    <li>Le righe successive → descrizione.</li>
+    <li><b>«€ 90/200 R100 ROSSI DA FOTOGRAFARE»</b> → base 90, stima 200, riserva 100, mandante ROSSI, nota «da fotografare».</li>
+  </ul>
+</div>
+<p class="muted">Per un Excel semplice puoi partire dal <a href="{% url 'modello_lotti' %}">modello</a>.</p>
+
+{% else %}
+<p>File <b>{{ dati.file }}</b> ·
+  <b>{{ n_ok }}</b> lotti pronti{% if n_err %} · <span class="warn">{{ n_err }} da sistemare</span>{% endif %}{% if n_esclusi %} · <span class="muted">{{ n_esclusi }} esclusi (sezioni «da inserire / prossime aste»)</span>{% endif %}{% if n_foto %} · <span class="foto">{{ n_foto }} da fotografare</span>{% endif %}
+  · <a href="?nuovo=1">carica un altro file</a></p>
+
+<form method="post">{% csrf_token %}
+  {% if da_abbinare %}
+  <h2>1. Abbina i mandanti</h2>
+  <p class="muted">Nel catalogo i mandanti sono scritti a parole. Scegli per ognuno il mandato corrispondente (una volta sola per tutti i suoi lotti).</p>
+  <div class="box abbina">
+    {% for i, testo, scelto, n in da_abbinare %}
+      <input type="hidden" name="testo_mandante" value="{{ testo }}">
+      <div><b>{{ testo|default:"(senza mandante)" }}</b> <span class="muted">· {{ n }} lott{{ n|pluralize:"o,i" }}</span></div>
+      <select name="abbina_{{ i }}"><option value="">— scegli il mandato —</option>
+        {% for m in mandati %}<option value="{{ m.pk }}" {% if scelto == m.pk %}selected{% endif %}>{{ m.mandante.codice }} · {{ m.mandante.nome }} · mandato {{ m.numero }} ({{ m.commissione_pct|floatformat:0 }}%)</option>{% endfor %}</select>
+    {% endfor %}
+  </div>
+  <p class="muted">Il mandante non c'è? <a href="{% url 'scheda_nuova' %}?ruolo=mandante" target="_blank">Crea la scheda</a> (si apre in un'altra finestra), poi premi «Aggiorna l'anteprima».</p>
+  {% endif %}
+
+  {% if tornate %}
+  <h2>{% if da_abbinare %}2{% else %}1{% endif %}. Dividi in tornate</h2>
+  <div class="box tornate">
+    <span>La tornata 1 parte dal primo lotto.</span>
+    {% for t, da in tornate %}<label>Tornata {{ t }} dal lotto <input name="tornata_{{ t }}" value="{{ da|default_if_none:'' }}" inputmode="numeric"></label>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="azioni"><button class="btn sec" name="azione" value="aggiorna">Aggiorna l'anteprima</button>
+    <button class="btn" name="azione" value="conferma" {% if not n_ok %}disabled{% endif %}>Carica {{ n_ok }} lotti</button></div>
+
+  <h2>Anteprima</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Lotto</th>{% if tornate %}<th>Torn.</th>{% endif %}<th>Titolo e descrizione</th><th>Mandante</th><th class="n">Base</th><th class="n">Stima</th><th class="n">Riserva</th><th>Esito</th></tr></thead>
+    <tbody>
+    {% for r in righe %}
+      {% ifchanged r.sezione %}{% if r.sezione %}<tr class="sez"><td colspan="8">{{ r.sezione }}</td></tr>{% endif %}{% endifchanged %}
+      <tr class="{% if r.escluso %}escluso{% elif r.errori %}mid{% else %}ok{% endif %}">
+        <td><b>{{ r.numero|default:"—" }}</b></td>{% if tornate %}<td>{{ r.tornata|default:1 }}</td>{% endif %}
+        <td><div class="tit">{{ r.titolo|default:"" }}</div><div class="desc">{{ r.descrizione|truncatechars:140 }}</div>
+          {% if r.note_interne %}<div class="desc"><i>Nota: {{ r.note_interne }}</i></div>{% endif %}</td>
+        <td>{% if r.mandato %}{{ r.mandato }}{% else %}<span class="warn">{{ r.mandante_testo|default:"—" }}</span>{% endif %}</td>
+        <td class="n">{{ r.valori.base_asta|euro }}</td><td class="n">{{ r.valori.stima_max|euro }}</td><td class="n">{{ r.valori.riserva|euro }}</td>
+        <td>{% if r.escluso %}escluso{% elif r.errori %}<span class="warn">{{ r.errori|join:"; " }}</span>{% else %}<span class="pill ok">ok</span>{% endif %}
+          {% if r.avvisi and not r.escluso %}<br><span class="muted">{{ r.avvisi|join:"; " }}</span>{% endif %}
+          {% if r.da_fotografare and not r.escluso %}<br><span class="foto">da fotografare</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <div class="azioni"><button class="btn sec" name="azione" value="aggiorna">Aggiorna l'anteprima</button>
+    <button class="btn" name="azione" value="conferma" {% if not n_ok %}disabled{% endif %}>Carica {{ n_ok }} lotti</button></div>
+</form>
+{% endif %}
+{% endblock %}

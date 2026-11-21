@@ -1,0 +1,12 @@
+{% extends "asta/base.html" %}
+{% block title %}Nuovo mandato{% endblock %}
+{% block doc %}
+<p><a href="{% url 'scheda' s.pk %}">← {{ s.nome }}</a></p>
+<h1>Nuovo mandato · {{ s.nome }}</h1>
+<p class="muted">Il mandato è l'accordo con il mandante: qui si fissa la commissione che gli trattenete sui lotti venduti.</p>
+<form method="post" class="campi box">{% csrf_token %}
+  {% for f in form %}<div class="{% if f.name == 'note_accordo' %}largo{% endif %}">
+    {% if f.field.widget.input_type == 'checkbox' %}<label>{{ f }} {{ f.label }}</label>{% else %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% endif %}{{ f.errors }}</div>{% endfor %}
+  <div class="largo azioni"><button class="btn">Crea mandato</button><a href="{% url 'scheda' s.pk %}">Annulla</a></div>
+</form>
+{% endblock %}

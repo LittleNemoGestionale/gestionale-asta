@@ -1,0 +1,127 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}{% if s %}{{ s.nome }}{% else %}Nuova scheda{% endif %}{% endblock %}
+{% block head %}<style>
+  .due { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:24px; align-items:start }
+  @media (max-width:900px){ .due { grid-template-columns:1fr } }
+  fieldset { border:1px solid var(--line); border-radius:10px; padding:14px 16px 16px; margin:0 0 16px; background:#fff }
+  legend { font-weight:600; padding:0 6px }
+  .griglia { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px 14px }
+  .griglia [hidden] { display:none }
+  form.campi input[type=radio], form.campi input[type=checkbox] { width:auto; margin:0 }
+  form.campi .radio-inline label, form.campi .check-grid label, form.campi label.spunta { text-transform:none; letter-spacing:0; font-size:14px; color:var(--ink); display:inline-flex; gap:6px; align-items:center; margin:0 }
+  .radio-inline ul, .check-grid ul { list-style:none; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:6px 16px }
+  .radio-inline label, .check-grid label { text-transform:none; letter-spacing:0; font-size:14px; color:var(--ink); display:inline-flex; gap:6px; align-items:center }
+  .solo-persona, .solo-ditta { display:contents }
+  .storico h3 { font-size:15px; margin:18px 0 6px }
+  .storico table { font-size:13px }
+</style>{% endblock %}
+{% block doc %}
+<p><a href="{% url 'anagrafica' %}">← Anagrafica</a></p>
+<h1>{% if s %}{{ s.nome }} <span class="muted" style="font-weight:400">· cod. {{ s.codice }}</span>{% else %}Nuova scheda{% endif %}</h1>
+{% if s %}<p>{% if s.is_cliente %}<span class="pill ok">cliente</span> {% endif %}{% if s.is_mandante %}<span class="pill mid">mandante</span>{% endif %}</p>{% endif %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+<div class="due">
+<form method="post" class="campi" style="display:block">{% csrf_token %}<input type="hidden" name="ritorno" value="{{ ritorno }}">
+  {% if form.non_field_errors %}<div class="msg error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <fieldset><legend>Chi è</legend>
+    <div class="radio-inline" style="margin-bottom:12px">{{ form.tipo }}</div>
+    <div class="griglia" id="campi-nome">
+      <div class="p"><label for="id_nome_proprio">Nome</label>{{ form.nome_proprio }}{{ form.nome_proprio.errors }}</div>
+      <div class="p"><label for="id_cognome">Cognome</label>{{ form.cognome }}{{ form.cognome.errors }}</div>
+      <div class="d largo"><label for="id_ragione_sociale">Ragione sociale</label>{{ form.ragione_sociale }}{{ form.ragione_sociale.errors }}</div>
+      <div><label for="id_codice_fiscale">{{ form.codice_fiscale.label }}</label>{{ form.codice_fiscale }}</div>
+      <div class="largo radio-inline"><ul><li><label>{{ form.is_cliente }} {{ form.is_cliente.label }}</label></li><li><label>{{ form.is_mandante }} {{ form.is_mandante.label }}</label></li></ul></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Contatti e pagamenti</legend>
+    <div class="griglia">
+      <div><label for="id_email">Email</label>{{ form.email }}</div>
+      <div><label for="id_telefono">Cellulare</label>{{ form.telefono }}</div>
+      <div class="largo"><label for="id_iban">{{ form.iban.label }}</label>{{ form.iban }}</div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Domicilio</legend>
+    <div class="griglia">
+      <div class="largo"><label for="id_dom-via">Via e numero civico</label>{{ dom.via }}</div>
+      <div><label for="id_dom-cap">CAP</label>{{ dom.cap }}</div>
+      <div><label for="id_dom-citta">Città</label>{{ dom.citta }}</div>
+      <div><label for="id_dom-provincia">Provincia</label>{{ dom.provincia }}</div>
+      <div><label for="id_dom-nazione">Nazione</label>{{ dom.nazione }}</div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Spedizione</legend>
+    <label class="spunta">
+      <input type="checkbox" name="spedizione_diversa" value="1" id="sped-diversa" style="width:auto" {% if diversa %}checked{% endif %}>
+      Spedire a un indirizzo diverso dal domicilio</label>
+    <div class="griglia" style="margin-top:12px" id="campi-sped" {% if not diversa %}hidden{% endif %}>
+      <div class="largo"><label for="id_sped-destinatario">Destinatario (se diverso)</label>{{ sped.destinatario }}</div>
+      <div class="largo"><label for="id_sped-via">Via e numero civico</label>{{ sped.via }}{{ sped.via.errors }}</div>
+      <div><label for="id_sped-cap">CAP</label>{{ sped.cap }}</div>
+      <div><label for="id_sped-citta">Città</label>{{ sped.citta }}</div>
+      <div><label for="id_sped-provincia">Provincia</label>{{ sped.provincia }}</div>
+      <div><label for="id_sped-nazione">Nazione</label>{{ sped.nazione }}</div>
+      <div><label for="id_sped-telefono_consegna">Telefono per il corriere</label>{{ sped.telefono_consegna }}</div>
+      <div class="largo"><label for="id_sped-note_consegna">Note per la consegna</label>{{ sped.note_consegna }}</div>
+    </div>
+    <p class="muted" id="sped-nota" style="margin:8px 0 0" {% if diversa %}hidden{% endif %}>Senza spunta si spedisce al domicilio.</p>
+  </fieldset>
+
+  <fieldset><legend>Interessi</legend>
+    <div class="check-grid">{{ form.interessi }}</div>
+    <div style="margin-top:10px;max-width:320px"><label for="id_nuovo_interesse">{{ form.nuovo_interesse.label }}</label>{{ form.nuovo_interesse }}</div>
+  </fieldset>
+
+  <fieldset><legend>Altro</legend>
+    <div class="griglia">
+      <div class="largo"><label for="id_documento">Documento d'identità</label>{{ form.documento }}<div class="aiuto">tipo, numero e scadenza (serve per importi alti)</div></div>
+      <div class="largo"><label for="id_note">Note</label>{{ form.note }}</div>
+    </div>
+  </fieldset>
+  {% if puo %}<div class="azioni"><button class="btn">Salva scheda</button>{% if ritorno %}<a href="{{ ritorno }}">Annulla</a>{% endif %}</div>{% endif %}
+</form>
+
+<div class="storico">
+{% if s %}
+  {% if s.is_cliente or acquisti %}
+  <h2 style="margin-top:0">Acquisti passati</h2>
+  {% if acquisti %}<p class="muted">{{ acquisti|length }} lott{{ acquisti|length|pluralize:"o,i" }} · {{ totale_acquisti|euro }} di aggiudicazioni</p>
+  <table><thead><tr><th>Asta</th><th>Lotto</th><th>Descrizione</th><th class="n">Prezzo</th></tr></thead>
+    <tbody>{% for a in acquisti %}<tr><td>{{ a.lotto.asta.numero }}<br><span class="muted">{{ a.lotto.asta.data|date:"d/m/y" }}</span></td><td>{{ a.lotto.numero }}</td><td>{{ a.lotto.etichetta|truncatechars:60 }}</td><td class="n">{{ a.prezzo_martello|euro }}</td></tr>{% endfor %}</tbody></table>
+  {% else %}<p class="muted">Ancora nessun acquisto.</p>{% endif %}
+  <h3>Palette</h3>
+  <p>{% for p in palette %}Asta {{ p.asta.numero }}: <b>{{ p.numero }}</b>{% if not forloop.last %} · {% endif %}{% empty %}<span class="muted">nessuna</span>{% endfor %}
+    · <a href="{% url 'palette' %}?cliente={{ s.pk }}">Assegna una paletta</a></p>
+  {% endif %}
+
+  {% if s.is_mandante %}
+  <h2>Come mandante</h2>
+  <h3>Mandati</h3>
+  <p>{% for m in mandati %}<b>{{ m.numero }}</b> del {{ m.data|date:"d/m/Y" }} · commissione {{ m.commissione_pct|floatformat:0 }}%{% if m.note_accordo %} <span class="muted">({{ m.note_accordo }})</span>{% endif %}<br>{% empty %}<span class="muted">Nessun mandato.</span><br>{% endfor %}
+    {% if perms.asta.add_mandato %}<a href="{% url 'nuovo_mandato' s.pk %}">+ Nuovo mandato</a>{% endif %}</p>
+  <h3>Lotti affidati</h3>
+  {% if affidati %}<table><thead><tr><th>Asta</th><th>Lotto</th><th>Descrizione</th><th>Esito</th></tr></thead>
+    <tbody>{% for l in affidati %}<tr><td>{{ l.asta.numero }}</td><td>{{ l.numero }}</td><td>{{ l.etichetta|truncatechars:50 }}</td>
+      <td>{% if l.stato == 'aggiudicato' %}venduto {{ l.aggiudicazione.prezzo_martello|euro }}{% else %}{{ l.get_stato_display }}{% endif %}</td></tr>{% endfor %}</tbody></table>
+  {% else %}<p class="muted">Nessun lotto affidato.</p>{% endif %}
+  {% endif %}
+{% else %}
+  <div class="box"><b>Come funziona</b><p class="muted">Compila i dati e salva. Il codice cliente viene assegnato in automatico.
+    Dopo il salvataggio qui compariranno acquisti passati, palette e, per i mandanti, mandati e lotti affidati.</p></div>
+{% endif %}
+</div>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('sped-diversa'), box=document.getElementById('campi-sped'), nota=document.getElementById('sped-nota');
+  cb.addEventListener('change',function(){ box.hidden=!cb.checked; nota.hidden=cb.checked; });
+  function tipo(){ var az=document.querySelector('input[name=tipo]:checked'); az = az && az.value==='azienda';
+    document.querySelectorAll('#campi-nome .p').forEach(function(e){ e.hidden=az; });
+    document.querySelectorAll('#campi-nome .d').forEach(function(e){ e.hidden=!az; }); }
+  document.querySelectorAll('input[name=tipo]').forEach(function(r){ r.addEventListener('change',tipo); }); tipo();
+})();
+</script>
+{% endblock %}

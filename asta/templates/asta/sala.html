@@ -1,0 +1,154 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Aggiudicazione – Asta {{ asta.numero }}{% endblock %}
+{% block head %}<style>
+  main { max-width:1180px }
+  .testa { display:flex; flex-wrap:wrap; gap:10px 24px; align-items:flex-end; justify-content:space-between }
+  .tornate { display:flex; gap:6px; flex-wrap:wrap }
+  .tornate a { padding:6px 12px; border:1px solid var(--line); border-radius:20px; text-decoration:none; color:var(--ink); background:#fff }
+  .tornate a.on { background:var(--accent); color:#fff; border-color:var(--accent) }
+  .conti { display:flex; gap:22px; flex-wrap:wrap; margin:12px 0 }
+  .conti div { color:var(--muted); font-size:13px } .conti b { display:block; font-size:20px; color:var(--ink) }
+  table.sala { font-size:15px }
+  table.sala td { vertical-align:middle; padding:5px 8px }
+  table.sala .num { font-size:18px; font-weight:700; width:60px }
+  table.sala input { font:600 17px/1 inherit; font-variant-numeric:tabular-nums; padding:7px 8px; border:2px solid var(--line); border-radius:7px; width:100%; background:#fff }
+  table.sala input:focus { border-color:var(--accent); outline:none; background:#fffdf6 }
+  table.sala .c-pal { width:95px } table.sala .c-prz { width:125px }
+  table.sala tr.corrente td { background:#fff7e0 }
+  table.sala tr.venduto td { background:#f0faf2 }
+  table.sala tr.invenduto td { background:#f6f6f6; color:#777 }
+  table.sala tr.venduto input, table.sala tr.invenduto input { border-color:transparent; background:transparent; color:var(--ink) }
+  .tit { font-weight:600 } .sub { color:var(--muted); font-size:12.5px }
+  .bt { padding:5px 10px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; font:inherit; font-size:13px }
+  .bt.ok { background:var(--accent); color:#fff; border-color:var(--accent) }
+  .bt[hidden] { display:none }
+  .esito { font-size:13px; white-space:nowrap }
+  #avviso { position:sticky; top:0; z-index:5; margin:8px 0; min-height:0 }
+  #avviso .msg { margin:0 }
+  .scorciatoie { font-size:12.5px; color:var(--muted) }
+  kbd { border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:12px; background:#fff }
+</style>{% endblock %}
+{% block doc %}
+<div class="testa">
+  <div><h1 style="margin:0">Aggiudicazione lotti · Asta {{ asta.numero }}</h1>
+    <p class="muted" style="margin:4px 0 0">Per ogni lotto scrivi <b>paletta</b> e <b>prezzo</b>, poi <kbd>Invio</kbd>: la riga si salva e si passa al lotto successivo.</p></div>
+  <div class="tornate">{% for t, orario in tornate %}<a href="?tornata={{ t }}" class="{% if t == tornata %}on{% endif %}">Tornata {{ t }}{% if orario.data and orario.data != asta.data %} · {{ orario.data|date:"D j/n" }}{% endif %}{% if orario.ora %} · {{ orario.ora|time:"H:i" }}{% endif %}</a>{% endfor %}</div>
+</div>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+{% if asta.chiusa %}<div class="msg error">L'asta è conclusa: la tabella è solo da consultare.</div>{% endif %}
+
+<div class="conti">
+  <div><b id="n-venduti">{{ n_venduti }}</b>venduti</div>
+  <div><b id="n-invenduti">{{ n_invenduti }}</b>invenduti</div>
+  <div><b id="n-da-battere">{{ n_da_battere }}</b>da battere</div>
+  <div><b id="totale">{{ totale|euro }}</b>totale tornata</div>
+</div>
+<div id="avviso" aria-live="polite"></div>
+
+<div class="scroll"><table class="sala">
+  <thead><tr><th>Lotto</th><th>Titolo</th><th class="n">Base</th><th class="n">Riserva</th><th>Paletta</th><th>Prezzo €</th><th></th></tr></thead>
+  <tbody>
+  {% for l in lotti %}
+    <tr id="l{{ l.pk }}" data-id="{{ l.pk }}" data-numero="{{ l.numero }}" data-stato="{{ l.stato }}"
+        class="{% if l.stato == 'aggiudicato' %}venduto{% elif l.stato == 'invenduto' %}invenduto{% endif %}">
+      <td class="num">{{ l.numero }}</td>
+      <td><div class="tit">{{ l.etichetta|truncatechars:70 }}</div>{% if l.illustratore %}<div class="sub">{{ l.illustratore }}</div>{% endif %}</td>
+      <td class="n">{{ l.base_asta|euro }}</td>
+      <td class="n">{% if l.riserva and l.riserva != l.base_asta %}{{ l.riserva|euro }}{% endif %}</td>
+      <td class="c-pal"><input class="pal" inputmode="numeric" autocomplete="off" aria-label="paletta lotto {{ l.numero }}"
+          value="{{ l.aggiudicazione.paletta.numero|default:'' }}" {% if l.stato != 'in_asta' or asta.chiusa %}readonly{% endif %}></td>
+      <td class="c-prz"><input class="prz" inputmode="decimal" autocomplete="off" aria-label="prezzo lotto {{ l.numero }}"
+          value="{% if l.aggiudicazione %}{{ l.aggiudicazione.prezzo_martello|floatformat:'-2g' }}{% endif %}" {% if l.stato != 'in_asta' or asta.chiusa %}readonly{% endif %}></td>
+      <td class="esito">
+        {% if not asta.chiusa %}
+        <button type="button" class="bt ok b-agg" {% if l.stato != 'in_asta' %}hidden{% endif %}>Aggiudica</button>
+        <button type="button" class="bt b-inv" {% if l.stato != 'in_asta' %}hidden{% endif %}>Invenduto</button>
+        <button type="button" class="bt b-cor" {% if l.stato == 'in_asta' %}hidden{% endif %}>Correggi</button>
+        {% endif %}
+        <span class="sr">{% if l.aggiudicazione.sotto_riserva %}<span class="pill mid">sotto riserva</span>{% elif l.stato == 'invenduto' %}invenduto{% endif %}</span>
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="7" class="muted">Nessun lotto in questa tornata.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+<p class="scorciatoie"><kbd>Invio</kbd> salva e passa al lotto dopo · <kbd>Tab</kbd> da paletta a prezzo · <kbd>Esc</kbd> svuota la riga ·
+  la tabella si aggiorna da sola se un altro computer registra un lotto.</p>
+
+<script>
+(function(){
+  var url = location.pathname, csrf = '{{ csrf_token }}';
+  var palette = new Set({{ palette|safe }});
+  var avviso = document.getElementById('avviso');
+  function mostra(testo, tipo){ avviso.innerHTML = testo ? '<div class="msg '+tipo+'"></div>' : ''; if(testo) avviso.firstChild.textContent = testo; }
+  function righe(){ return Array.prototype.slice.call(document.querySelectorAll('tr[data-id]')); }
+  function euro(v){ return '€ ' + Number(v).toLocaleString('it-IT',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function prossima(tr){ var r = righe(), i = r.indexOf(tr); for (var j=i+1;j<r.length;j++){ if(r[j].dataset.stato==='in_asta') return r[j]; } return null; }
+  function evidenzia(){ righe().forEach(function(r){ r.classList.remove('corrente'); }); var p = righe().find(function(r){ return r.dataset.stato==='in_asta'; }); if(p) p.classList.add('corrente'); return p; }
+  function conteggi(){
+    var r = righe(), v=0, i=0, d=0, t=0;
+    r.forEach(function(x){ if(x.dataset.stato==='aggiudicato'){ v++; t += Number(x.dataset.prezzo||0); } else if(x.dataset.stato==='invenduto') i++; else if(x.dataset.stato==='in_asta') d++; });
+    document.getElementById('n-venduti').textContent=v; document.getElementById('n-invenduti').textContent=i;
+    document.getElementById('n-da-battere').textContent=d; document.getElementById('totale').textContent=euro(t);
+  }
+  function applica(tr, s){
+    tr.dataset.stato = s.stato; tr.dataset.prezzo = s.prezzo || '';
+    tr.classList.toggle('venduto', s.stato==='aggiudicato'); tr.classList.toggle('invenduto', s.stato==='invenduto');
+    var pal = tr.querySelector('.pal'), prz = tr.querySelector('.prz'), aperto = s.stato==='in_asta';
+    if (document.activeElement!==pal && document.activeElement!==prz || !aperto){
+      pal.value = s.paletta || (aperto ? pal.value : ''); prz.value = s.prezzo ? Number(s.prezzo).toLocaleString('it-IT') : (aperto ? prz.value : '');
+    }
+    pal.readOnly = prz.readOnly = !aperto;
+    var q = function(c){ return tr.querySelector(c); };
+    if(q('.b-agg')){ q('.b-agg').hidden = q('.b-inv').hidden = !aperto; q('.b-cor').hidden = aperto; }
+    q('.sr').innerHTML = s.sotto_riserva ? '<span class="pill mid">sotto riserva</span>' : (s.stato==='invenduto' ? 'invenduto' : '');
+  }
+  function invia(tr, azione, conferma){
+    var dati = {lotto: tr.dataset.id, azione: azione, paletta: tr.querySelector('.pal').value, prezzo: tr.querySelector('.prz').value, conferma: !!conferma};
+    if (azione==='aggiudica' && !dati.paletta){ mostra('Scrivi il numero di paletta del lotto '+tr.dataset.numero+'.', 'error'); tr.querySelector('.pal').focus(); return; }
+    if (azione==='aggiudica' && !dati.prezzo){ mostra('Scrivi il prezzo del lotto '+tr.dataset.numero+'.', 'error'); tr.querySelector('.prz').focus(); return; }
+    fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body:JSON.stringify(dati)})
+      .then(function(r){ return r.json(); }).then(function(e){
+        if (e.conferma){ chiediConferma(tr, e.errore); return; }
+        applica(tr, e.lotto); conteggi();
+        if (!e.ok){ mostra(e.errore, 'error'); var c = tr.querySelector(e.campo==='prezzo' ? '.prz' : '.pal'); c.focus(); c.select(); return; }
+        mostra(e.msg, azione==='annulla' ? 'info' : 'success');
+        if (azione==='annulla'){ tr.querySelector('.pal').focus(); evidenzia(); return; }
+        var n = prossima(tr); evidenzia(); if(n){ n.querySelector('.pal').focus(); n.scrollIntoView({block:'center', behavior:'smooth'}); }
+      }).catch(function(){ mostra('Connessione al programma non riuscita: la riga NON è stata salvata. Riprova.', 'error'); });
+  }
+  function chiediConferma(tr, testo){
+    avviso.innerHTML = '<div class="msg error" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span></span>'+
+      '<button type="button" class="bt ok" id="si">Sì, aggiudica</button><button type="button" class="bt" id="no">No, correggo</button></div>';
+    avviso.querySelector('span').textContent = testo;
+    document.getElementById('si').onclick = function(){ invia(tr, 'aggiudica', true); };
+    document.getElementById('no').onclick = function(){ mostra('', ''); tr.querySelector('.prz').focus(); tr.querySelector('.prz').select(); };
+    document.getElementById('si').focus();
+  }
+  righe().forEach(function(tr){
+    var pal = tr.querySelector('.pal'), prz = tr.querySelector('.prz');
+    pal.addEventListener('input', function(){ var v = pal.value.trim(); pal.style.borderColor = v && !palette.has(Number(v)) ? '#b00020' : ''; });
+    [pal, prz].forEach(function(inp){ inp.addEventListener('keydown', function(e){
+      if (e.key==='Enter'){ e.preventDefault(); if (tr.dataset.stato!=='in_asta') return;
+        if (inp===pal && !prz.value){ prz.focus(); return; } invia(tr, 'aggiudica'); }
+      if (e.key==='Escape'){ pal.value=''; prz.value=''; pal.focus(); }
+    }); });
+    var q = function(c){ return tr.querySelector(c); };
+    if (q('.b-agg')){
+      q('.b-agg').onclick = function(){ invia(tr, 'aggiudica'); };
+      q('.b-inv').onclick = function(){ invia(tr, 'invenduto'); };
+      q('.b-cor').onclick = function(){ invia(tr, 'annulla'); };
+    }
+  });
+  var c = evidenzia(); if (c && !location.hash){ c.querySelector('.pal').focus(); c.scrollIntoView({block:'center'}); }
+  // aggiornamento da altre postazioni
+  setInterval(function(){
+    fetch(url + '?formato=json').then(function(r){ return r.json(); }).then(function(d){
+      d.lotti.forEach(function(s){ var tr = document.getElementById('l'+s.id); if (tr && tr.dataset.stato !== s.stato) applica(tr, s); });
+      conteggi(); evidenzia();
+    }).catch(function(){});
+  }, 5000);
+})();
+</script>
+<noscript><form method="post" class="box azioni">{% csrf_token %}Lotto <input name="lotto"> Paletta <input name="paletta"> Prezzo <input name="prezzo">
+  <button class="btn" name="azione" value="aggiudica">Aggiudica</button><button class="btn sec" name="azione" value="invenduto">Invenduto</button></form></noscript>
+{% endblock %}

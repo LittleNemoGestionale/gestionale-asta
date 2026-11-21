@@ -1,0 +1,21 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Aggiudicazioni – {{ asta.nome }}{% endblock %}
+{% block doc %}
+{% include "asta/_intestazione.html" with titolo="Lista aggiudicazioni" %}
+<table>
+  <thead><tr><th>Lotto</th><th>Paletta</th><th>Mandante</th><th class="n">Martello</th><th class="n">Diritti {{ asta.diritti_pct }}%</th><th class="n">di cui IVA</th><th class="n">Comm. mand.</th><th class="n">Netto mand.</th></tr></thead>
+  <tbody>{% for a in agg %}
+    <tr><td>{{ a.lotto.numero }}</td><td>{{ a.paletta.numero }}</td><td>{{ a.lotto.mandato.mandante.codice }}</td>
+      <td class="n">{{ a.prezzo_martello|euro }}</td><td class="n">{{ a.diritti|euro }}</td><td class="n">{{ a.iva_diritti|euro }}</td>
+      <td class="n">{{ a.commissione|euro }} <span class="muted">({{ a.lotto.commissione_effettiva }}%)</span></td><td class="n">{{ a.netto_mandante|euro }}</td></tr>
+  {% endfor %}</tbody>
+  <tfoot><tr><td colspan="3">Totali ({{ agg|length }} lotti)</td>
+    <td class="n">{{ tot.prezzo_martello|euro }}</td><td class="n">{{ tot.diritti|euro }}</td><td class="n">{{ tot.iva_diritti|euro }}</td>
+    <td class="n">{{ tot.commissione|euro }}</td><td class="n">{{ tot.netto_mandante|euro }}</td></tr></tfoot>
+</table>
+<table class="tot">
+  <tr><td>Diritti d'asta acquirenti</td><td class="n">{{ tot.diritti|euro }}</td></tr>
+  <tr><td>Commissioni mandanti</td><td class="n">{{ tot.commissione|euro }}</td></tr>
+  <tr><td>Spese di spedizione addebitate</td><td class="n">{{ tot.spedizioni|euro }}</td></tr>
+</table>
+{% endblock %}

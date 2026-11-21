@@ -1,0 +1,80 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Asta {{ asta.numero }} – {{ asta.nome }}{% endblock %}
+{% block head %}<style>
+  .fasi { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:16px; margin-top:18px }
+  .fase { border:1px solid var(--line); border-radius:12px; padding:16px 18px; background:#fff; display:grid; gap:10px; align-content:start }
+  .fase h2 { margin:0; font-size:17px; display:flex; gap:10px; align-items:center }
+  .fase h2 .n { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; font-size:14px }
+  .fase .voce { display:flex; justify-content:space-between; gap:12px; align-items:baseline; padding:8px 0; border-top:1px solid var(--line) }
+  .fase .voce a { font-weight:600; color:var(--accent); text-decoration:none }
+  .fase .voce a:hover { text-decoration:underline }
+  .fase .voce span { color:var(--muted); font-size:13px; text-align:right }
+  .numeri { display:flex; flex-wrap:wrap; gap:8px 28px; margin:6px 0 0 }
+  .numeri div b { display:block; font-size:22px }
+  .numeri div { color:var(--muted); font-size:13px }
+</style>{% endblock %}
+{% block doc %}
+<p><a href="{% url 'aste' %}">← Tutte le aste</a></p>
+<h1>Asta {{ asta.numero }} · {{ asta.nome }}</h1>
+<p class="muted">{{ asta.data|date:"l d/m/Y" }}{% if asta.data_fine and asta.data_fine != asta.data %} → {{ asta.data_fine|date:"l d/m/Y" }}{% endif %}
+  · {{ asta.numero_tornate }} tornat{{ asta.numero_tornate|pluralize:"a,e" }}{% if asta.luogo %} · {{ asta.luogo }}{% endif %}
+  · <span class="pill {% if asta.stato == 'futura' %}mid{% elif asta.stato == 'conclusa' %}no{% else %}ok{% endif %}">{{ asta.stato }}</span></p>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+<div class="numeri">
+  <div><b>{{ n_lotti }}</b>lotti</div>
+  <div><b>{{ palette|length }}</b>palette</div>
+  <div><b>{{ n_aggiudicati }}</b>venduti</div>
+  <div><b>{{ n_invenduti }}</b>invenduti</div>
+  <div><b>{{ totale|euro }}</b>totale aggiudicato</div>
+</div>
+
+{% if perms.asta.view_dati_personali %}
+<div class="box" style="margin-top:16px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center">
+  <b style="margin-right:6px">Documenti da scaricare</b>
+  <a class="btn sec" href="{% url 'pdf_conteggi' asta.pk %}">⬇ Aggiudicazioni per paletta (acquirenti, PDF)</a>
+  <a class="btn sec" href="{% url 'pdf_mandanti_tutti' asta.pk %}">⬇ Rendiconti mandanti (PDF)</a>
+  <a class="btn sec" href="{% url 'faldone' asta.pk %}">⬇ Faldone (Excel)</a>
+  <span class="muted" style="font-size:13px">Il documento di un singolo acquirente o mandante si scarica da <a href="{% url 'acquirenti' asta.pk %}">Acquirenti</a> e <a href="{% url 'mandanti' asta.pk %}">Mandanti</a>.</span>
+</div>
+{% endif %}
+<div class="fasi">
+  <section class="fase"><h2><span class="n">1</span> Prima dell'asta</h2>
+    <div class="voce"><a href="{% url 'lotti_asta' asta.pk %}">Lotti</a><span>catalogo: aggiungi, carica da Excel, riproponi invenduti</span></div>
+    <div class="voce"><a href="{% url 'importa_lotti' asta.pk %}?nuovo=1">Carica il catalogo</a><span>dal file Word delle schede</span></div>
+    <div class="voce"><a href="{% url 'faldone' asta.pk %}">Faldone</a><span>Excel per gestione, battitore, tornate, registrazione, assicurazione</span></div>
+    <div class="voce"><a href="{% url 'palette' %}?asta={{ asta.pk }}">Palette</a><span>assegna i numeri ai clienti</span></div>
+    {% if perms.asta.change_asta %}<div class="voce"><a href="{% url 'asta_modifica' asta.pk %}">Dati dell'asta</a><span>tema, date, tornate, diritti</span></div>{% endif %}
+  </section>
+
+  <section class="fase"><h2><span class="n">2</span> Durante l'asta</h2>
+    <div class="voce"><a href="{% url 'sala' asta.pk %}">Aggiudicazione lotti</a><span>per ogni lotto: paletta e prezzo, tornata per tornata</span></div>
+    <div class="voce"><a href="{% url 'doc_aggiudicazioni' asta.pk %}">Aggiudicazioni</a><span>elenco con diritti e commissioni</span></div>
+  </section>
+
+  <section class="fase"><h2><span class="n">3</span> Dopo l'asta</h2>
+    {% if perms.asta.view_dati_personali %}<div class="voce"><a href="{% url 'acquirenti' asta.pk %}">Acquirenti</a><span>conteggio per paletta (PDF), consegna e costo, email con Outlook</span></div>{% endif %}
+    {% if perms.asta.view_incasso %}<div class="voce"><a href="{% url 'incassi' asta.pk %}">Incassi dai clienti</a><span>chi ha pagato, chi no · Excel per la contabile</span></div>{% endif %}
+    {% if perms.asta.view_dati_personali %}<div class="voce"><a href="#conti">Conti e spedizioni</a><span>un documento per paletta</span></div>{% endif %}
+    {% if perms.asta.view_dati_personali %}<div class="voce"><a href="{% url 'mandanti' asta.pk %}">Mandanti: rendiconti</a><span>aggiudicato − diritti − spese, PDF ed email</span></div>{% endif %}
+    {% if perms.asta.view_pagamentomandante %}<div class="voce"><a href="{% url 'pagamenti_mandanti' asta.pk %}">Pagamenti ai mandanti</a><span>rendiconti, acconti, saldi</span></div>{% endif %}
+    {% if perms.asta.view_dati_personali %}<div class="voce"><a href="{% url 'post_asta' asta.pk %}">Post asta</a><span>vendita degli invenduti per {{ asta.giorni_post_asta }} giorni{% if asta.post_asta_aperto %} · <b>aperto fino al {{ asta.fine_post_asta|date:"d/m" }}</b>{% endif %}</span></div>{% endif %}
+    <div class="voce"><a href="{% url 'doc_invenduti' asta.pk %}">Invenduti</a><span>dopo il post asta: contovendita o resa</span></div>
+    {% if perms.asta.change_asta %}<div class="voce"><form method="post" action="{% url 'asta_conclusa' asta.pk %}">{% csrf_token %}<input type="hidden" name="chiusa" value="{% if asta.chiusa %}0{% else %}1{% endif %}">
+      <button style="background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--accent);cursor:pointer">{% if asta.chiusa %}Riapri l'asta{% else %}Chiudi l'asta{% endif %}</button></form>
+      <span>{% if asta.chiusa %}torna tra quelle aperte{% else %}quando è tutto incassato e pagato: va tra le passate{% endif %}</span></div>{% endif %}
+  </section>
+</div>
+
+{% if perms.asta.view_dati_personali and palette %}
+<h2 id="conti" style="margin-top:34px">Conti e schede di spedizione</h2>
+<table>
+  <thead><tr><th>Paletta</th><th>Cliente</th><th>Consegna</th><th></th></tr></thead>
+  <tbody>{% for p in palette %}
+    <tr><td><b>{{ p.numero }}</b></td><td><a href="{% url 'scheda' p.acquirente.pk %}">{{ p.acquirente.nome }}</a></td>
+      <td>{% if p.modalita %}{{ p.modalita.nome }}{% if p.indirizzo_spedizione %} · {{ p.indirizzo_spedizione.citta }}{% endif %}{% else %}<a href="{% url 'acquirenti' asta.pk %}#p{{ p.numero }}" class="warn">da decidere</a>{% endif %}</td>
+      <td class="n"><a href="{% url 'doc_conto' asta.pk p.numero %}">Conto</a>{% if p.indirizzo_spedizione %} · <a href="{% url 'doc_spedizione' asta.pk p.numero %}">Scheda spedizione</a>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% endif %}
+{% endblock %}

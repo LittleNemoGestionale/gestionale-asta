@@ -1,0 +1,19 @@
+{% load euro %}{% autoescape off %}Gentile {{ m.nome }},
+
+Le inviamo il rendiconto dei lotti affidati per l'asta {{ asta.numero }} «{{ asta.nome }}» (rif. {{ rif.numero }}/{{ rif.anno }}). Il documento completo è in allegato.
+{% for a in r.venduti %}
+- Lotto {{ a.lotto.numero }}: {{ a.lotto.etichetta|truncatechars:60 }} — {{ a.prezzo_martello|euro }}{% endfor %}
+
+Totale aggiudicazioni: {{ r.totali.martello|euro }}
+Diritti d'asta{% if r.percentuale %} {{ r.percentuale|floatformat:0 }}%{% endif %}: -{{ r.totali.commissione|euro }}{% for i in r.inserimenti %}
+Spese inserimento lotti ({{ i.n }} x {{ i.unitario|euro }}): -{{ i.importo|euro }}{% endfor %}{% for s in r.spese %}
+{{ s.descrizione }}: -{{ s.importo|euro }}{% endfor %}
+TOTALE A SUO FAVORE: {{ r.totali.netto|euro }}
+{% if r.non_venduti %}
+Lotti non venduti: {% for l in r.non_venduti %}{{ l.numero }}{% if not forloop.last %}, {% endif %}{% endfor %}.{% endif %}
+
+Il pagamento avverrà con bonifico{% if m.iban %} sull'IBAN {{ m.iban }}{% else %}: ci comunichi per favore il Suo IBAN{% endif %}, dopo l'incasso dagli acquirenti.
+
+Cordiali saluti,
+{{ firma }}
+{% endautoescape %}

@@ -1,0 +1,19 @@
+{% load euro %}<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5;max-width:640px">
+<p>Gentile {{ m.nome }},</p>
+<p>Le inviamo il rendiconto dei lotti che ci ha affidato per l'<b>asta {{ asta.numero }} «{{ asta.nome }}»</b> (rif. {{ rif.numero }}/{{ rif.anno }}). Il documento completo è in allegato.</p>
+{% if r.venduti %}<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px;width:100%">
+  <tr style="background:#f2f2f2"><th align="left">Lotto</th><th align="left">Descrizione</th><th align="right">Aggiudicazione</th></tr>
+  {% for a in r.venduti %}<tr style="border-bottom:1px solid #ddd"><td>{{ a.lotto.numero }}</td><td>{{ a.lotto.etichetta|truncatechars:70 }}{% if a.post_asta %} (post asta){% endif %}</td><td align="right">{{ a.prezzo_martello|euro }}</td></tr>{% endfor %}
+</table>{% else %}<p>Nessuno dei lotti è stato venduto in questa asta.</p>{% endif %}
+<table cellpadding="4" cellspacing="0" style="font-size:14px;margin:12px 0 0 auto">
+  <tr><td>Totale aggiudicazioni</td><td align="right">{{ r.totali.martello|euro }}</td></tr>
+  <tr><td>Diritti d'asta{% if r.percentuale %} {{ r.percentuale|floatformat:0 }}%{% endif %}</td><td align="right">−{{ r.totali.commissione|euro }}</td></tr>
+  {% if r.totali.iva_commissione %}<tr><td>IVA sui diritti</td><td align="right">−{{ r.totali.iva_commissione|euro }}</td></tr>{% endif %}
+  {% for i in r.inserimenti %}<tr><td>Spese inserimento lotti ({{ i.n }} × {{ i.unitario|euro }})</td><td align="right">−{{ i.importo|euro }}</td></tr>{% endfor %}
+  {% for s in r.spese %}<tr><td>{{ s.descrizione }}</td><td align="right">−{{ s.importo|euro }}</td></tr>{% endfor %}
+  <tr><td><b>Totale a Suo favore</b></td><td align="right"><b>{{ r.totali.netto|euro }}</b></td></tr>
+</table>
+{% if r.non_venduti %}<p>Lotti non venduti: {% for l in r.non_venduti %}{{ l.numero }}{% if not forloop.last %}, {% endif %}{% endfor %}. La contatteremo per concordare se riproporli o restituirli.</p>{% endif %}
+<p>Il pagamento avverrà {% if m.iban %}con bonifico sull'IBAN {{ m.iban }}{% else %}con bonifico: ci comunichi per favore il Suo IBAN{% endif %}, dopo l'incasso dagli acquirenti.</p>
+<p>Cordiali saluti,<br>{{ firma|linebreaksbr }}</p>
+</div>

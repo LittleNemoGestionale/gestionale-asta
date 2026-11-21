@@ -1,0 +1,55 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Post asta – Asta {{ asta.numero }}{% endblock %}
+{% block doc %}
+<h1>Post asta · Asta {{ asta.numero }}</h1>
+<p>{% if prima %}<span class="pill mid">non ancora iniziato</span> L'asta finisce il {{ asta.fine|date:"d/m/Y" }}; il post asta dura poi {{ asta.giorni_post_asta }} giorni.
+  {% elif aperto %}<span class="pill ok">aperto</span> fino al <b>{{ asta.fine_post_asta|date:"d/m/Y" }}</b> · ancora {{ giorni_rimasti }} giorn{{ giorni_rimasti|pluralize:"o,i" }}.
+  {% else %}<span class="pill no">chiuso</span> dal {{ asta.fine_post_asta|date:"d/m/Y" }}: gli invenduti rimasti vanno in contovendita o resi (<a href="{% url 'doc_invenduti' asta.pk %}">lista invenduti</a>).{% endif %}</p>
+<p class="muted">Chi compra in post asta usa la sua paletta dell'asta, se ne ha una; altrimenti riceve il primo numero libero della fascia post asta.
+  Le vendite finiscono negli incassi, nei conti e nei rendiconti come quelle in sala.</p>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+<div class="numeri" style="display:flex;gap:28px;margin:10px 0 4px">
+  <div><b style="font-size:22px;display:block">{{ invenduti|length }}</b><span class="muted">ancora invenduti</span></div>
+  <div><b style="font-size:22px;display:block">{{ venduti|length }}</b><span class="muted">venduti in post asta</span></div>
+  <div><b style="font-size:22px;display:block">{{ totale|euro }}</b><span class="muted">incasso post asta</span></div>
+</div>
+
+<h2>Lotti invenduti</h2>
+<datalist id="elenco-clienti">{% for c in clienti %}<option data-id="{{ c.pk }}" value="{{ c.codice }} – {{ c.nome }}">{% endfor %}</datalist>
+<div class="scroll"><table>
+  <thead><tr><th>Lotto</th><th>Titolo</th><th>Mandante</th><th class="n">Base</th><th class="n">Riserva</th><th>{% if aperto %}Vendi a{% endif %}</th></tr></thead>
+  <tbody>{% for l in invenduti %}
+    <tr id="l{{ l.pk }}"><td><b>{{ l.numero }}</b></td><td>{{ l.etichetta|truncatechars:60 }}</td><td>{{ l.mandato.mandante.codice }}</td>
+      <td class="n">{{ l.base_asta|euro }}</td><td class="n">{{ l.riserva|euro }}</td>
+      <td>{% if aperto %}<form method="post" class="vendi" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">{% csrf_token %}
+          <input type="hidden" name="lotto" value="{{ l.pk }}"><input type="hidden" name="cliente" class="cid">
+          <input list="elenco-clienti" class="ccerca" placeholder="cliente…" required style="width:200px;padding:5px;border:1px solid var(--line);border-radius:5px" aria-label="cliente lotto {{ l.numero }}">
+          <input name="prezzo" placeholder="€" required inputmode="decimal" style="width:80px;padding:5px;border:1px solid var(--line);border-radius:5px" aria-label="prezzo lotto {{ l.numero }}">
+          {% if l.riserva %}<label style="font-size:12px;display:inline-flex;gap:4px;align-items:center"><input type="checkbox" name="conferma" value="1"> sotto riserva</label>{% endif %}
+          <button class="btn" style="padding:5px 12px">Vendi</button></form>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Nessun lotto invenduto.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="muted">Il cliente non c'è? <a href="{% url 'scheda_nuova' %}" target="_blank">Crea la scheda</a> e ricarica la pagina.</p>
+
+{% if venduti %}
+<h2>Venduti in post asta</h2>
+<table>
+  <thead><tr><th>Data</th><th>Lotto</th><th>Titolo</th><th>Cliente</th><th>Paletta</th><th class="n">Prezzo</th><th></th></tr></thead>
+  <tbody>{% for a in venduti %}
+    <tr><td>{{ a.registrata_il|date:"d/m/Y" }}</td><td><b>{{ a.lotto.numero }}</b></td><td>{{ a.lotto.etichetta|truncatechars:50 }}</td>
+      <td><a href="{% url 'scheda' a.paletta.acquirente.pk %}">{{ a.paletta.acquirente.nome }}</a></td><td>{{ a.paletta.numero }}</td>
+      <td class="n">{{ a.prezzo_martello|euro }}{% if a.sotto_riserva %} <span class="pill mid">sotto riserva</span>{% endif %}</td>
+      <td class="n"><form method="post">{% csrf_token %}<input type="hidden" name="lotto" value="{{ a.lotto.pk }}"><input type="hidden" name="azione" value="annulla">
+        <button style="background:none;border:0;color:var(--accent);cursor:pointer;font:inherit">annulla</button></form></td></tr>
+  {% endfor %}</tbody>
+</table>
+{% endif %}
+<script>
+document.querySelectorAll('form.vendi').forEach(function(f){
+  var cerca=f.querySelector('.ccerca'), id=f.querySelector('.cid');
+  cerca.addEventListener('input', function(){ var o=[].find.call(document.querySelectorAll('#elenco-clienti option'), function(x){ return x.value===cerca.value; }); id.value=o?o.dataset.id:''; });
+  f.addEventListener('submit', function(e){ if(!id.value){ e.preventDefault(); cerca.focus(); cerca.setCustomValidity('Scegli il cliente dall\'elenco'); cerca.reportValidity(); setTimeout(function(){ cerca.setCustomValidity(''); }, 2000); } });
+});
+</script>
+{% endblock %}

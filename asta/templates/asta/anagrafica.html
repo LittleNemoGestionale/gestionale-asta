@@ -1,0 +1,25 @@
+{% extends "asta/base.html" %}
+{% block title %}Anagrafica{% endblock %}
+{% block doc %}
+<div class="azioni" style="justify-content:space-between"><h1 style="margin:0">Anagrafica</h1>
+  {% if perms.asta.add_soggetto %}<span><a class="btn" href="{% url 'scheda_nuova' %}">+ Nuovo cliente</a> <a class="btn sec" href="{% url 'scheda_nuova' %}?ruolo=mandante">+ Nuovo mandante</a></span>{% endif %}</div>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<form method="get" class="box azioni">
+  <input name="q" value="{{ q }}" placeholder="Cerca per nome, codice, città, email o codice fiscale" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font:inherit" autofocus>
+  <select name="ruolo" style="padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit">
+    <option value="">Tutti</option><option value="clienti" {% if ruolo == 'clienti' %}selected{% endif %}>Solo clienti</option><option value="mandanti" {% if ruolo == 'mandanti' %}selected{% endif %}>Solo mandanti</option></select>
+  <select name="interesse" style="padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit">
+    <option value="">Qualsiasi interesse</option>{% for i in interessi %}<option value="{{ i.pk }}" {% if interesse == i.pk|stringformat:'s' %}selected{% endif %}>{{ i }}</option>{% endfor %}</select>
+  <button class="btn">Cerca</button>
+</form>
+<p class="muted">{{ totale }} schede{% if totale > 300 %} (mostrate le prime 300){% endif %}</p>
+<div class="scroll"><table>
+  <thead><tr><th>Cod.</th><th>Nome / Ragione sociale</th><th>Ruolo</th><th>Città</th><th>Cellulare</th><th>Interessi</th></tr></thead>
+  <tbody>{% for s in schede %}
+    <tr style="cursor:pointer" onclick="location.href='{% url 'scheda' s.pk %}'"><td>{{ s.codice }}</td><td><a href="{% url 'scheda' s.pk %}"><b>{{ s.nome }}</b></a></td>
+      <td>{% if s.is_cliente %}<span class="pill ok">cliente</span> {% endif %}{% if s.is_mandante %}<span class="pill mid">mandante</span>{% endif %}</td>
+      <td>{% for i in s.indirizzi.all %}{% if i.tipo == 'domicilio' %}{{ i.citta }}{% if i.provincia %} ({{ i.provincia }}){% endif %}{% endif %}{% endfor %}</td>
+      <td>{{ s.telefono }}</td><td class="muted">{{ s.interessi.all|join:", " }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Nessuna scheda trovata.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}
