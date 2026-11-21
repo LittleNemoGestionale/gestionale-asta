@@ -1249,3 +1249,29 @@ class MandanteDeiLottiTest(TestCase):
         self.client.post(f"/asta/{asta.pk}/lotti/", {"azione": "cambia_mandato", "sel": [l1.pk], "nuovo_mandato": m_vero.pk})
         l1.refresh_from_db(); l2.refresh_from_db()
         self.assertEqual((l1.mandato, l1.note_interne, l2.mandato), (m_vero, "MANCA", m_da))
+
+
+class MandanteGiaInAnagraficaTest(TestCase):
+    def test_usa_la_scheda_esistente(self):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from openpyxl import Workbook
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        cliente = Soggetto.objects.create(nome_proprio="Luca", cognome="Neri", is_cliente=True, email="luca@example.com")
+        Soggetto.objects.create(nome_proprio="Anna", cognome="Verdi", is_cliente=True)
+        Soggetto.objects.create(nome_proprio="Paolo", cognome="Verdi", is_cliente=True)
+        wb = Workbook(); ws = wb.active; ws.title = "Foglio1"
+        ws.append(["Lotto", "Mandanti", "Mand. N."])
+        ws.append([1, "NERI LUCA", 5001])
+        ws.append([2, "VERDI", 5002])
+        buf = io.BytesIO(); wb.save(buf)
+        r = self.client.post("/mandanti/da-faldone/", {"file": SimpleUploadedFile("f.xlsx", buf.getvalue())})
+        ris = {x["mandato"].numero: x for x in r.context["risultato"]}
+        self.assertEqual((ris["5001"]["mandato"].mandante, ris["5001"]["nuovo"]), (cliente, False))
+        cliente.refresh_from_db()
+        self.assertEqual((cliente.is_mandante, cliente.email), (True, "luca@example.com"))
+        verdi = ris["5002"]["mandato"].mandante
+        self.assertTrue(ris["5002"]["nuovo"])
+        self.assertIn("Possibile doppione", verdi.note)

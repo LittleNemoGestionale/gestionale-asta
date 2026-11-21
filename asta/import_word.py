@@ -103,18 +103,26 @@ def separa_mandante_e_note(resto: str) -> tuple[str, str]:
 class Riconoscitore:
     """Abbina il testo del mandante scritto nel catalogo (es. «ROSSI») alle schede dell'anagrafica."""
 
-    def __init__(self):
-        self.mandanti = [(s, set(_parole(s.nome))) for s in Soggetto.objects.filter(is_mandante=True)]
+    def __init__(self, solo_mandanti=True):
+        qs = Soggetto.objects.filter(is_mandante=True) if solo_mandanti else Soggetto.objects.all()
+        self.mandanti = [(s, set(_parole(s.nome))) for s in qs]
+
+    def candidati(self, testo: str) -> list:
+        parole = set(_parole(testo))
+        return [s for s, nome in self.mandanti if parole and parole <= nome]  # tutte le parole del testo nel nome
 
     def trova(self, testo: str):
         parole = set(_parole(testo))
         if not parole:
             return None
-        candidati = [s for s, nome in self.mandanti if parole <= nome]  # tutte le parole del testo nel nome
+        candidati = self.candidati(testo)
         if len(candidati) == 1:
             return candidati[0]
         esatti = [s for s, nome in self.mandanti if parole == nome]
-        return esatti[0] if len(esatti) == 1 else None
+        if len(esatti) == 1:
+            return esatti[0]
+        mandanti = [s for s in candidati if s.is_mandante]  # tra più schede, quella che è già mandante
+        return mandanti[0] if len(mandanti) == 1 else None
 
     @staticmethod
     def mandato_di(soggetto, asta=None):

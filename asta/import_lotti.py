@@ -285,12 +285,22 @@ def mandato_provvisorio(testo: str, asta, creati: dict, numero: str = ""):
         return creati[chiave]
     gia = Mandato.objects.filter(numero=numero).select_related("mandante").first() if numero else None
     sogg = gia.mandante if gia else None
+    dubbi = []
     if sogg is None and testo != MANDANTE_SCONOSCIUTO:
-        sogg = Riconoscitore().trova(testo)
+        # cerca in TUTTA l'anagrafica (anche chi finora era solo cliente): se c'è, usa quella scheda con i suoi dati
+        ric = Riconoscitore(solo_mandanti=False)
+        sogg = ric.trova(testo)
+        dubbi = [] if sogg else ric.candidati(testo)
     if sogg is None:
-        sogg = next((x for x in Soggetto.objects.filter(is_mandante=True) if (x.nome or "").upper() == testo.upper()), None)
+        sogg = next((x for x in Soggetto.objects.all() if (x.nome or "").upper() == testo.upper()), None)
     if sogg is None:
         sogg = nuova_scheda_mandante(testo, f"dal catalogo dell'asta {asta.numero or asta.nome}" if asta else "dal faldone")
+        if dubbi:
+            sogg.note += " Possibile doppione di: " + ", ".join(f"{x.nome} (codice {x.codice})" for x in dubbi[:5]) + "."
+            sogg.save(update_fields=["note"])
+    if not sogg.is_mandante:
+        sogg.is_mandante = True
+        sogg.save(update_fields=["is_mandante"])
     m = gia if gia and gia.mandante_id == sogg.pk else None
     if m is None and not numero:
         m = Riconoscitore.mandato_di(sogg, asta)
