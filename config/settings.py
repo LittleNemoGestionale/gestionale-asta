@@ -19,6 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Cartella dei dati (database, impostazioni, backup). Tutto ciò che va
 # salvato/spostato su un altro computer sta qui dentro.
 DATI_DIR = Path(os.environ.get("ASTA_DATI_DIR", BASE_DIR / "dati"))
+DATI_DIR.mkdir(parents=True, exist_ok=True)
 
 # Impostazioni dell'installazione (chiavi, nome casa d'aste, percorsi backup),
 # create da avvia.py al primo avvio. Le variabili d'ambiente hanno la precedenza.
