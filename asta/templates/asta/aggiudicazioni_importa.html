@@ -1,0 +1,23 @@
+{% extends "asta/base.html" %}
+{% block title %}Carica aggiudicazioni · Asta {{ asta.numero }}{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<p><a href="{% url 'sala' asta.pk %}">← Aggiudicazione</a></p>
+<h1>Carica aggiudicazioni da Excel · Asta {{ asta.numero }}</h1>
+<div class="box">
+  <p>Per registrare in una volta i risultati di un'asta già fatta, o per fare una prova. I lotti devono essere già nell'asta
+    (<a href="{% url 'importa_lotti' asta.pk %}?nuovo=1">carica prima il catalogo</a>, anche dallo stesso Excel).</p>
+  <ul>
+    <li>Colonne: <b>Lotto</b>, <b>Aggiudicato</b> (o «Valore Agg.», «Prezzo»), <b>Paletta</b>. La riga dei titoli può essere più in basso.</li>
+    <li>Le palette che non esistono vengono create con una scheda «ACQUIRENTE PALETTA N» da completare.</li>
+    <li>I lotti già aggiudicati restano come sono.</li>
+  </ul>
+  <form method="post" enctype="multipart/form-data" class="campi" style="grid-template-columns:1fr">{% csrf_token %}
+    <div><label for="f">File Excel</label><input id="f" type="file" name="file" accept=".xlsx" required></div>
+    <div><label for="pp">Paletta da usare quando nel file manca</label><input id="pp" name="paletta_predefinita" inputmode="numeric" placeholder="es. 1 (lascia vuoto per saltare quelle righe)" style="max-width:360px">
+      <div class="aiuto">Utile per una prova con un file senza palette: tutte le aggiudicazioni vanno su quella paletta.</div></div>
+    <div><label style="text-transform:none;font-size:14px;color:var(--ink)"><input type="checkbox" name="invenduti" value="1" checked> I lotti senza prezzo sono invenduti</label></div>
+    <div><button class="btn">Carica aggiudicazioni</button></div>
+  </form>
+</div>
+{% endblock %}

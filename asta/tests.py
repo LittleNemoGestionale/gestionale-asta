@@ -1163,3 +1163,32 @@ class SezioneMandantiTest(TestCase):
         r = self.client.get(f"/mandati/nuovo/?asta=&cliente={nuovo.pk}")
         self.assertEqual(r.context["s"], nuovo)
         self.assertContains(r, "Registra il nuovo mandante")
+
+
+class ImportaAggiudicazioniTest(TestCase):
+    def test_da_excel(self):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from openpyxl import Workbook
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        asta = Asta.objects.create(numero=93, nome="Prova", data=date(2099, 1, 1))
+        s = Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        m = Mandato.objects.create(mandante=s, numero="2099/001", data=date.today(), commissione_pct=15)
+        for n in ("1", "2", "3", "299bis"):
+            Lotto.objects.create(asta=asta, numero=n, mandato=m, titolo=f"Lotto {n}", base_asta=100)
+        wb = Workbook(); ws = wb.active
+        ws.append(["Lotto", "Titolo", "Aggiudicato", "Paletta"])
+        ws.append([1, "Lotto 1", 275, 12])
+        ws.append([2, "Lotto 2", None, None])
+        ws.append(["299bis", "Lotto 299bis", "1.600,00", None])
+        ws.append([77, "Inesistente", 50, 12])
+        buf = io.BytesIO(); wb.save(buf)
+        self.client.post(f"/asta/{asta.pk}/sala/importa/", {
+            "file": SimpleUploadedFile("agg.xlsx", buf.getvalue()), "paletta_predefinita": "1", "invenduti": "1"})
+        agg = {a.lotto.numero: (a.paletta.numero, a.prezzo_martello) for a in Aggiudicazione.objects.select_related("lotto", "paletta")}
+        self.assertEqual(agg, {"1": (12, D("275")), "299bis": (1, D("1600"))})
+        self.assertEqual(Lotto.objects.get(asta=asta, numero="2").stato, Lotto.Stato.INVENDUTO)
+        self.assertEqual(Lotto.objects.get(asta=asta, numero="3").stato, Lotto.Stato.IN_ASTA)
+        self.assertEqual(Paletta.objects.get(asta=asta, numero=12).acquirente.nome, "ACQUIRENTE PALETTA 12")

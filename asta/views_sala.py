@@ -10,7 +10,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import Aggiudicazione, Asta, Lotto, Paletta, Tornata
+from .models import Aggiudicazione, Asta, Lotto, Paletta, Soggetto, Tornata
 
 
 def parse_euro(s: str) -> Decimal:
@@ -206,3 +206,79 @@ def post_asta(request, asta_id):
         "clienti": Soggetto.objects.order_by("codice"),
         "totale": sum((a.prezzo_martello for a in venduti), Decimal(0)),
     })
+
+
+COLONNE_AGG = {
+    "lotto": ["lotto", "n lotto", "nr lotto", "numero", "n.", "n"],
+    "prezzo": ["aggiudicato", "aggiudicazione", "valore agg.", "valore agg", "prezzo martello", "prezzo", "agg."],
+    "paletta": ["paletta", "pal.", "pal", "n paletta"],
+}
+
+
+@login_required
+@permission_required("asta.add_aggiudicazione", raise_exception=True)
+def importa_aggiudicazioni(request, asta_id):
+    """Aggiudicazioni da Excel (lotto, paletta, prezzo): per caricare un'asta passata o fare una prova."""
+    import io
+
+    from openpyxl import load_workbook
+    asta = get_object_or_404(Asta, pk=asta_id)
+    if request.method == "POST" and request.FILES.get("file"):
+        try:
+            wb = load_workbook(io.BytesIO(request.FILES["file"].read()), data_only=True)
+        except Exception:
+            messages.error(request, "Il file non è un Excel (.xlsx) leggibile.")
+            return redirect("importa_aggiudicazioni", asta.pk)
+        righe = list(wb.worksheets[0].iter_rows(values_only=True))
+        norm = lambda c: re.sub(r"\s+", " ", str(c or "").strip().lower())  # noqa: E731
+        idx = next((i for i, r in enumerate(righe[:20]) if any(norm(c) in COLONNE_AGG["prezzo"] for c in r)), None)
+        if idx is None:
+            messages.error(request, "Nel file non trovo la colonna del prezzo («Aggiudicato», «Valore Agg.» o «Prezzo»).")
+            return redirect("importa_aggiudicazioni", asta.pk)
+        head = [norm(c) for c in righe[idx]]
+        pos = {k: next((i for i, h in enumerate(head) if h in nomi), None) for k, nomi in COLONNE_AGG.items()}
+        predefinita = (request.POST.get("paletta_predefinita") or "").strip()
+        invenduti = request.POST.get("invenduti") == "1"
+        lotti = {l.numero.lower(): l for l in asta.lotti.select_related("aggiudicazione")}
+        fatti, nuove_palette, errori, n_inv = 0, set(), [], 0
+        for n, r in enumerate(righe[idx + 1:], start=idx + 2):
+            get = lambda k: r[pos[k]] if pos[k] is not None and pos[k] < len(r) else None  # noqa: E731
+            num = str(get("lotto") or "").strip().removesuffix(".0").lower()
+            if not num:
+                continue
+            lotto = lotti.get(num)
+            if not lotto:
+                errori.append(f"riga {n}: lotto {num} non c'è nell'asta")
+                continue
+            prezzo = get("prezzo")
+            if prezzo in (None, "", 0):
+                if invenduti and not hasattr(lotto, "aggiudicazione") and lotto.stato == Lotto.Stato.IN_ASTA:
+                    lotto.stato = Lotto.Stato.INVENDUTO
+                    lotto.save(update_fields=["stato"])
+                    n_inv += 1
+                continue
+            pal = str(get("paletta") or "").strip().removesuffix(".0") or predefinita
+            if not pal.isdigit():
+                errori.append(f"riga {n}: lotto {num} senza paletta")
+                continue
+            if not Paletta.objects.filter(asta=asta, numero=int(pal)).exists():
+                segnaposto = Soggetto.objects.create(
+                    tipo="azienda", ragione_sociale=f"ACQUIRENTE PALETTA {pal}", is_cliente=True,
+                    note=f"Scheda creata caricando le aggiudicazioni dell'asta {asta.numero or asta.nome}: da completare.")
+                Paletta.objects.create(asta=asta, numero=int(pal), acquirente=segnaposto)
+                nuove_palette.add(int(pal))
+            if hasattr(lotto, "aggiudicazione"):
+                errori.append(f"lotto {num} già aggiudicato: lasciato com'era")
+                continue
+            esito = registra(asta, lotto, "aggiudica", pal, str(prezzo), conferma=True, utente=request.user)
+            if esito["ok"]:
+                fatti += 1
+            else:
+                errori.append(f"riga {n}: {esito['errore']}")
+        messages.success(request, f"{fatti} aggiudicazioni caricate" + (f", {n_inv} lotti segnati invenduti" if n_inv else "") + ".")
+        if nuove_palette:
+            messages.info(request, f"Palette create con un acquirente da completare: {', '.join(map(str, sorted(nuove_palette)))}.")
+        if errori:
+            messages.error(request, "Non caricate: " + "; ".join(errori[:40]) + (" …" if len(errori) > 40 else ""))
+        return redirect("sala", asta.pk)
+    return render(request, "asta/aggiudicazioni_importa.html", {"asta": asta})

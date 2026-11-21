@@ -36,6 +36,7 @@ urlpatterns = [
     path("asta/<int:asta_id>/pagamenti-mandanti/", views.pagamenti_mandanti, name="pagamenti_mandanti"),
     path("asta/<int:asta_id>/excel/<str:quale>/", views.excel_contabilita, name="excel_contabilita"),
     path("asta/<int:asta_id>/offerte/", views_offerte.offerte_telefoni, name="offerte_telefoni"),
+    path("asta/<int:asta_id>/sala/importa/", views_sala.importa_aggiudicazioni, name="importa_aggiudicazioni"),
     path("asta/<int:asta_id>/sala/", views_sala.sala, name="sala"),
     path("asta/<int:asta_id>/post-asta/", views_sala.post_asta, name="post_asta"),
     path("asta/<int:asta_id>/acquirenti/", views_acquirenti.acquirenti, name="acquirenti"),

@@ -31,6 +31,7 @@
 {% block doc %}
 <div class="testa">
   <div><h1 style="margin:0">Aggiudicazione lotti · Asta {{ asta.numero }}</h1>
+    {% if not asta.chiusa and perms.asta.add_aggiudicazione %}<a class="muted noprint" style="font-size:13px" href="{% url 'importa_aggiudicazioni' asta.pk %}">Carica aggiudicazioni da Excel (asta passata o prova)</a>{% endif %}
     <p class="muted" style="margin:4px 0 0">Per ogni lotto scrivi <b>paletta</b> e <b>prezzo</b>, poi <kbd>Invio</kbd>: la riga si salva e si passa al lotto successivo.</p></div>
   <div class="tornate">{% for t, orario in tornate %}<a href="?tornata={{ t }}" class="{% if t == tornata %}on{% endif %}">Tornata {{ t }}{% if orario.data and orario.data != asta.data %} · {{ orario.data|date:"D j/n" }}{% endif %}{% if orario.ora %} · {{ orario.ora|time:"H:i" }}{% endif %}</a>{% endfor %}</div>
 </div>
