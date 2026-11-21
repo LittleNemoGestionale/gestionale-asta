@@ -8,8 +8,8 @@
   <p>Per registrare in una volta i risultati di un'asta già fatta, o per fare una prova. I lotti devono essere già nell'asta
     (<a href="{% url 'importa_lotti' asta.pk %}?nuovo=1">carica prima il catalogo</a>, anche dallo stesso Excel).</p>
   <ul>
-    <li>Colonne: <b>Lotto</b>, <b>Aggiudicato</b> (o «Valore Agg.», «Prezzo»), <b>Paletta</b>. La riga dei titoli può essere più in basso.</li>
-    <li>Le palette che non esistono vengono create con una scheda «ACQUIRENTE PALETTA N» da completare.</li>
+    <li>Colonne: <b>Lotto</b>, <b>Aggiudicato</b> (o «Valore Agg.», «Prezzo»), <b>Paletta</b>, e se c'è <b>Acquirente</b> (nome). La riga dei titoli può essere più in basso.</li>
+    <li>Le palette che non esistono vengono create con la scheda dell'acquirente (il nome dalla colonna Acquirente, altrimenti «ACQUIRENTE PALETTA N»), da completare.</li>
     <li>I lotti già aggiudicati restano come sono.</li>
   </ul>
   <form method="post" enctype="multipart/form-data" class="campi" style="grid-template-columns:1fr">{% csrf_token %}

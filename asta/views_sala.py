@@ -208,10 +208,12 @@ def post_asta(request, asta_id):
     })
 
 
-COLONNE_AGG = {
+COLONNE_AGG = {  # in ordine di preferenza: nel faldone «Prezzo» è la riserva, quindi viene dopo «Aggiudicato»
     "lotto": ["lotto", "n lotto", "nr lotto", "numero", "n.", "n"],
-    "prezzo": ["aggiudicato", "aggiudicazione", "valore agg.", "valore agg", "prezzo martello", "prezzo", "agg."],
+    "bis": ["bis"],
+    "prezzo": ["aggiudicato", "aggiudicazione", "valore agg.", "valore agg", "prezzo martello", "agg.", "prezzo"],
     "paletta": ["paletta", "pal.", "pal", "n paletta"],
+    "acquirente": ["acquirente", "cliente", "nome acquirente"],
 }
 
 
@@ -236,14 +238,14 @@ def importa_aggiudicazioni(request, asta_id):
             messages.error(request, "Nel file non trovo la colonna del prezzo («Aggiudicato», «Valore Agg.» o «Prezzo»).")
             return redirect("importa_aggiudicazioni", asta.pk)
         head = [norm(c) for c in righe[idx]]
-        pos = {k: next((i for i, h in enumerate(head) if h in nomi), None) for k, nomi in COLONNE_AGG.items()}
+        pos = {k: next((head.index(n) for n in nomi if n in head), None) for k, nomi in COLONNE_AGG.items()}
         predefinita = (request.POST.get("paletta_predefinita") or "").strip()
         invenduti = request.POST.get("invenduti") == "1"
         lotti = {l.numero.lower(): l for l in asta.lotti.select_related("aggiudicazione")}
         fatti, nuove_palette, errori, n_inv = 0, set(), [], 0
         for n, r in enumerate(righe[idx + 1:], start=idx + 2):
             get = lambda k: r[pos[k]] if pos[k] is not None and pos[k] < len(r) else None  # noqa: E731
-            num = str(get("lotto") or "").strip().removesuffix(".0").lower()
+            num = (str(get("lotto") or "").strip().removesuffix(".0") + str(get("bis") or "").strip()).lower()
             if not num:
                 continue
             lotto = lotti.get(num)
@@ -262,10 +264,15 @@ def importa_aggiudicazioni(request, asta_id):
                 errori.append(f"riga {n}: lotto {num} senza paletta")
                 continue
             if not Paletta.objects.filter(asta=asta, numero=int(pal)).exists():
-                segnaposto = Soggetto.objects.create(
-                    tipo="azienda", ragione_sociale=f"ACQUIRENTE PALETTA {pal}", is_cliente=True,
-                    note=f"Scheda creata caricando le aggiudicazioni dell'asta {asta.numero or asta.nome}: da completare.")
-                Paletta.objects.create(asta=asta, numero=int(pal), acquirente=segnaposto)
+                nome = str(get("acquirente") or "").strip() or f"ACQUIRENTE PALETTA {pal}"
+                gia = Paletta.objects.filter(asta=asta).values_list("acquirente_id", flat=True)
+                acquirente = next((x for x in Soggetto.objects.exclude(pk__in=gia) if x.nome == nome), None) \
+                    if get("acquirente") else None
+                if not acquirente:
+                    acquirente = Soggetto.objects.create(
+                        tipo="azienda", ragione_sociale=nome, is_cliente=True,
+                        note=f"Scheda creata caricando le aggiudicazioni dell'asta {asta.numero or asta.nome}: da completare.")
+                Paletta.objects.create(asta=asta, numero=int(pal), acquirente=acquirente)
                 nuove_palette.add(int(pal))
             if hasattr(lotto, "aggiudicazione"):
                 errori.append(f"lotto {num} già aggiudicato: lasciato com'era")
