@@ -1099,3 +1099,31 @@ class IncollaDaExcelTest(TestCase):
         self.assertEqual([(o.descrizione, o.categoria, o.riserva, o.note) for o in m.oggetti.all()],
                          [("A. Pazienza – Ritratti", "", D("70"), "q.tà 1"),
                           ("A. Pazienza – Il cavaliere; serigrafia", "Grafica e stampe", D("1500"), "q.tà 1")])
+
+
+class LeggiFotoTest(TestCase):
+    def setUp(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+
+    def test_lettura_con_claude(self):
+        from unittest import mock
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from . import lettura_foto
+        ritaglio = lambda: SimpleUploadedFile("tabella.jpg", b"\xff\xd8\xff" + b"0" * 50, "image/jpeg")  # noqa: E731
+        with mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}):
+            r = self.client.post("/mandati/leggi-foto/", {"ritaglio": ritaglio()})
+        self.assertEqual(r.status_code, 400)
+        righe = [{"quantita": "1", "descrizione": "A. Pazienza – Ritratti", "riserva": "70", "incerta": False, "dubbio": ""},
+                 {"quantita": "2", "descrizione": "A. Pazienza – Il corvo", "riserva": "1.500", "incerta": True,
+                  "dubbio": "prezzo spostato di riga"}]
+        with mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}), \
+                mock.patch.object(lettura_foto, "leggi_tabella", return_value=righe) as leggi:
+            r = self.client.post("/mandati/leggi-foto/", {"ritaglio": ritaglio()})
+        self.assertEqual(leggi.call_args.args[1], "image/jpeg")
+        self.assertEqual(r.json()["righe"], [
+            {"descrizione": "A. Pazienza – Ritratti", "riserva": "70", "note": "", "incerta": False},
+            {"descrizione": "A. Pazienza – Il corvo", "riserva": "1500", "incerta": True,
+             "note": "q.tà 2 · DA VERIFICARE: prezzo spostato di riga"}])

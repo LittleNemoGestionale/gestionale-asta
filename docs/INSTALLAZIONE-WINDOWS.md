@@ -46,6 +46,16 @@ CASA_ASTA_FIRMA = firma delle email
 ASTA_BACKUP_COPIE = E:\BackupAsta ; C:\Users\…\OneDrive\BackupAsta
 ```
 
+### Lettura delle foto dei mandati con Claude (facoltativa)
+
+Per far leggere a Claude la tabella degli oggetti dalla foto del modulo serve una chiave:
+1. su <https://console.anthropic.com> crea un account dell'azienda, aggiungi un metodo di pagamento
+   e crea una chiave API (**API Keys → Create Key**);
+2. aggiungi in `impostazioni.ini` la riga `ANTHROPIC_API_KEY = sk-ant-...` e riavvia il gestionale.
+
+A Claude arriva **solo il riquadro della tabella** scelto sulla foto (mai nome, indirizzo o IBAN del mandante).
+In `dati\claude.log` resta il numero di token usati per ogni lettura (non il contenuto), per controllare i costi.
+
 Il **logo** per i documenti PDF va messo in `C:\GestionaleAsta\dati\logo.png`.
 Dopo ogni modifica chiudi la finestra nera e riapri AVVIA-GESTIONALE.
 

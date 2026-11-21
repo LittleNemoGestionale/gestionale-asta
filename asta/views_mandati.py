@@ -9,7 +9,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -36,6 +36,11 @@ def salva_allegati(request, mandato) -> list[str]:
         else:
             Allegato.salva(mandato, f, request.user.get_username())
     return errori
+
+
+def _lettura_attiva() -> bool:
+    from .lettura_foto import attiva
+    return attiva()
 
 
 def numero_mandato_nuovo() -> str:
@@ -268,7 +273,7 @@ def mandato_nuovo(request, soggetto_id=None):
         if not soggetto_id else []
     return render(request, "asta/mandato_nuovo.html", {
         "s": s, "form": form, "errori": errori, "mandanti": mandanti_elenco, "categorie": categorie_usate(),
-        "righe_vuote": range(5), "incolla": request.POST.get("incolla", "")})
+        "righe_vuote": range(5), "incolla": request.POST.get("incolla", ""), "lettura_claude": _lettura_attiva()})
 
 
 @login_required
@@ -321,7 +326,8 @@ def mandato(request, mandato_id):
     allegati = list(m.allegati.all())
     return render(request, "asta/mandato.html", {"m": m, "form": form, "oggetti": oggetti, "allegati": allegati,
                                                  "foto": [a for a in allegati if a.immagine],
-                                                 "righe_vuote": range(5 if not oggetti else 3), **ctx_barra()})
+                                                 "righe_vuote": range(5 if not oggetti else 3),
+                                                 "lettura_claude": _lettura_attiva(), **ctx_barra()})
 
 
 @login_required
@@ -499,3 +505,34 @@ def importa_mandati(request):
             messages.error(request, "Righe non caricate: " + "; ".join(errori))
         return redirect("mandati")
     return render(request, "asta/mandati_importa.html", {})
+
+
+@login_required
+@permission_required("asta.add_mandato", raise_exception=True)
+def leggi_foto(request):
+    """Riceve dal browser il ritaglio della tabella (non la foto intera) e restituisce le righe lette da Claude."""
+    from . import lettura_foto
+    if request.method != "POST":
+        return JsonResponse({"errore": "metodo non valido"}, status=405)
+    if not lettura_foto.attiva():
+        return JsonResponse({"errore": "La lettura con Claude non è attiva: va aggiunta la chiave ANTHROPIC_API_KEY "
+                                       "in dati\\impostazioni.ini (vedi la guida)."}, status=400)
+    f = request.FILES.get("ritaglio")
+    if not f or not (f.content_type or "").startswith("image/") or f.size > 8 * 1024 * 1024:
+        return JsonResponse({"errore": "Ritaglio mancante o troppo grande."}, status=400)
+    try:
+        righe = lettura_foto.leggi_tabella(f.read(), f.content_type)
+    except RuntimeError as e:
+        return JsonResponse({"errore": str(e)}, status=502)
+    out = []
+    for r in righe:
+        try:
+            riserva = euro(r["riserva"]) if r["riserva"].strip() else None
+        except InvalidOperation:
+            riserva = None
+        note = [f"q.tà {r['quantita']}" if r["quantita"].strip() and r["quantita"].strip() != "1" else ""]
+        if r["incerta"]:
+            note.append("DA VERIFICARE: " + (r["dubbio"] or "lettura incerta"))
+        out.append({"descrizione": r["descrizione"].strip(), "riserva": str(riserva) if riserva is not None else "",
+                    "note": " · ".join(x for x in note if x)[:250], "incerta": bool(r["incerta"])})
+    return JsonResponse({"righe": [r for r in out if r["descrizione"]]})

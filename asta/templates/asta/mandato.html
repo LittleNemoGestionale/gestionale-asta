@@ -43,6 +43,10 @@ button.link{border:0;background:none;color:var(--accent);cursor:pointer;font:inh
   {% if foto %}<aside class="visore" id="visore" >
     <div class="comandi"><b style="margin-right:auto">Foto del modulo</b>
       <button data-v="-" title="Rimpicciolisci">−</button><button data-v="1">Adatta</button><button data-v="+" title="Ingrandisci">+</button><button data-v="r" title="Ruota di 90°">Ruota ↻</button></div>
+    <div class="leggi">{% if lettura_claude %}<div><button data-v="sel" class="btn" style="font-size:13px;padding:4px 10px">Leggi la tabella con Claude</button>
+      <button data-v="invia" class="btn sec" style="font-size:13px;padding:4px 10px" hidden>Invia il riquadro a Claude</button></div>
+      <span class="stato">Riquadra solo la tabella degli oggetti: nome e dati del mandante restano fuori e non escono dal computer.</span>
+      {% else %}<span class="stato">Lettura automatica con Claude non attiva (va aggiunta la chiave in impostazioni.ini).</span>{% endif %}</div>
     {% if foto|length > 1 %}<div class="miniature" style="margin-bottom:6px">{% for a in foto %}<button type="button" data-src="{% url 'allegato' a.pk %}" class="{% if forloop.first %}on{% endif %}"><img src="{% url 'allegato' a.pk %}" alt=""></button>{% endfor %}</div>{% endif %}
     <div class="area"><div style="position:relative"><img alt="Foto del modulo del mandato"></div></div>
   </aside>{% endif %}
@@ -55,7 +59,8 @@ button.link{border:0;background:none;color:var(--accent);cursor:pointer;font:inh
 </form>
 </div></div>
 {% if foto %}<script>
-  const vis = Visore(document.getElementById("visore"));
+  const vis = Visore(document.getElementById("visore"), {url: "{% url 'leggi_foto' %}",
+    csrf: document.querySelector("[name=csrfmiddlewaretoken]").value, onRighe: riempiRighe});
   vis.mostra("{% url 'allegato' foto.0.pk %}");
   document.querySelectorAll(".miniature button").forEach(b => b.addEventListener("click", () => {
     document.querySelectorAll(".miniature button").forEach(x => x.classList.toggle("on", x === b));

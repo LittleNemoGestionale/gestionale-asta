@@ -9,15 +9,25 @@
   .visore .comandi button { font:inherit; font-size:13px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer }
   .visore .area { height:min(78vh,900px); overflow:auto; background:#fff; border-radius:6px; cursor:grab }
   .visore img { display:block; transform-origin:top left; max-width:none }
+  .visore .area > div { position:relative }
+  .visore.selezione .area { cursor:crosshair }
+  .sel-box { position:absolute; border:2px dashed #b00020; background:rgba(176,0,32,.08); pointer-events:none }
+  .leggi { display:grid; gap:6px; margin-bottom:6px; font-size:13px }
+  .leggi .stato { color:var(--muted) }
+  tr.incerta td { background:#fff2b3 }
   .miniature { display:flex; gap:6px; flex-wrap:wrap }
   .miniature button { padding:0; border:2px solid transparent; border-radius:6px; background:none; cursor:pointer }
   .miniature button.on { border-color:var(--accent) }
   .miniature img { width:56px; height:56px; object-fit:cover; border-radius:4px; display:block }
 </style>
 <script>
-function Visore(aside) {
-  const img = aside.querySelector("img"), area = aside.querySelector(".area");
-  let zoom = 1, giro = 0;
+function Visore(aside, opzioni) {
+  opzioni = opzioni || {};
+  const img = aside.querySelector("img"), area = aside.querySelector(".area"), foglio = img.parentElement;
+  const stato = aside.querySelector(".leggi .stato");
+  let zoom = 1, giro = 0, sel = null, box = null;
+  function scrivi(t) { if (stato) stato.textContent = t; }
+  function fineSelezione() { aside.classList.remove("selezione"); }
   function disegna() {
     if (!img.naturalWidth) return;
     const larg = area.clientWidth - 4, base = larg / (giro % 180 ? img.naturalHeight : img.naturalWidth);
@@ -36,14 +46,78 @@ function Visore(aside) {
     if (v === "-") zoom = Math.max(zoom / 1.3, 0.5);
     if (v === "1") zoom = 1;
     if (v === "r") giro = (giro + 90) % 360;
+    if (v === "sel") { aside.classList.add("selezione"); if (box) box.remove(); box = sel = null;
+      scrivi("Trascina un riquadro intorno alla sola tabella degli oggetti (senza nome e indirizzo del mandante)."); return; }
+    if (v === "invia") { invia(); return; }
+    if (v !== "sel") { if (box) box.remove(); box = sel = null; }
     disegna();
   });
-  let tira = null;  // trascina per spostarsi nella foto ingrandita
-  area.addEventListener("pointerdown", e => { tira = {x: e.clientX, y: e.clientY, l: area.scrollLeft, t: area.scrollTop}; area.style.cursor = "grabbing"; });
-  addEventListener("pointerup", () => { tira = null; area.style.cursor = "grab"; });
-  area.addEventListener("pointermove", e => { if (tira) { area.scrollLeft = tira.l - (e.clientX - tira.x); area.scrollTop = tira.t - (e.clientY - tira.y); } });
+  let tira = null;  // trascina per spostarsi, oppure per disegnare il riquadro della tabella
+  function punto(e) { const r = foglio.getBoundingClientRect(); return {x: Math.max(0, Math.min(e.clientX - r.left, r.width)), y: Math.max(0, Math.min(e.clientY - r.top, r.height))}; }
+  area.addEventListener("pointerdown", e => {
+    if (aside.classList.contains("selezione")) {
+      const p = punto(e); sel = {x0: p.x, y0: p.y, x1: p.x, y1: p.y};
+      if (!box) { box = document.createElement("div"); box.className = "sel-box"; foglio.appendChild(box); }
+      tira = "sel"; e.preventDefault(); return;
+    }
+    tira = {x: e.clientX, y: e.clientY, l: area.scrollLeft, t: area.scrollTop}; area.style.cursor = "grabbing";
+  });
+  addEventListener("pointerup", () => {
+    if (tira === "sel") { fineSelezione(); if (sel && Math.abs(sel.x1 - sel.x0) > 20 && Math.abs(sel.y1 - sel.y0) > 20) {
+      scrivi("Riquadro pronto: premi «Invia il riquadro a Claude». A Claude arriva solo questa parte della foto.");
+      aside.querySelector('[data-v="invia"]').hidden = false; } }
+    tira = null; area.style.cursor = "";
+  });
+  area.addEventListener("pointermove", e => {
+    if (tira === "sel") { const p = punto(e); sel.x1 = p.x; sel.y1 = p.y;
+      Object.assign(box.style, {left: Math.min(sel.x0, sel.x1) + "px", top: Math.min(sel.y0, sel.y1) + "px",
+        width: Math.abs(sel.x1 - sel.x0) + "px", height: Math.abs(sel.y1 - sel.y0) + "px"}); return; }
+    if (tira) { area.scrollLeft = tira.l - (e.clientX - tira.x); area.scrollTop = tira.t - (e.clientY - tira.y); }
+  });
+  function ritaglio() {
+    // foto girata come la si vede, poi solo il riquadro scelto (al massimo 2000 px di lato, senza dati EXIF)
+    const giraW = giro % 180 ? img.naturalHeight : img.naturalWidth, giraH = giro % 180 ? img.naturalWidth : img.naturalHeight;
+    const k = giraW / foglio.clientWidth;
+    const x = Math.min(sel.x0, sel.x1) * k, y = Math.min(sel.y0, sel.y1) * k;
+    const w = Math.abs(sel.x1 - sel.x0) * k, h = Math.abs(sel.y1 - sel.y0) * k;
+    const tutto = document.createElement("canvas"); tutto.width = giraW; tutto.height = giraH;
+    const c = tutto.getContext("2d");
+    c.translate(giraW / 2, giraH / 2); c.rotate(giro * Math.PI / 180); c.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    const s = Math.min(1, 2000 / Math.max(w, h));
+    const out = document.createElement("canvas"); out.width = Math.round(w * s); out.height = Math.round(h * s);
+    out.getContext("2d").drawImage(tutto, x, y, w, h, 0, 0, out.width, out.height);
+    return new Promise(ok => out.toBlob(ok, "image/jpeg", 0.9));
+  }
+  async function invia() {
+    if (!sel) return;
+    const bottone = aside.querySelector('[data-v="invia"]'); bottone.disabled = true;
+    scrivi("Claude sta leggendo la tabella… (qualche secondo)");
+    try {
+      const dati = new FormData(); dati.append("ritaglio", await ritaglio(), "tabella.jpg");
+      const r = await fetch(opzioni.url, {method: "POST", body: dati, headers: {"X-CSRFToken": opzioni.csrf}});
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.errore || "lettura non riuscita");
+      opzioni.onRighe(j.righe);
+      const incerte = j.righe.filter(x => x.incerta).length;
+      scrivi(`Lette ${j.righe.length} righe${incerte ? `, ${incerte} da verificare (in giallo)` : ""}: controllale accanto alla foto prima di registrare.`);
+      if (box) box.remove(); box = sel = null; bottone.hidden = true;
+    } catch (err) { scrivi("Non riuscito: " + err.message); }
+    bottone.disabled = false;
+  }
   img.addEventListener("load", disegna);
   addEventListener("resize", disegna);
-  return { mostra(src) { zoom = 1; giro = 0; img.src = src; } };
+  return { mostra(src) { zoom = 1; giro = 0; if (box) box.remove(); box = sel = null; img.src = src; } };
+}
+function riempiRighe(righe) {
+  // mette le righe lette nella tabella «Oggetti del mandato», usando prima le righe vuote
+  const corpo = document.querySelector("#tab-righe tbody");
+  for (const r of righe) {
+    let tr = [...corpo.rows].find(t => !t.querySelector('[name="r_descrizione"]').value.trim());
+    if (!tr) { tr = corpo.rows[0].cloneNode(true); tr.querySelectorAll("input").forEach(i => i.value = ""); corpo.appendChild(tr); }
+    tr.querySelector('[name="r_descrizione"]').value = r.descrizione;
+    tr.querySelector('[name="r_riserva"]').value = r.riserva;
+    tr.querySelector('[name="r_note"]').value = r.note;
+    tr.classList.toggle("incerta", r.incerta);
+  }
 }
 </script>

@@ -11,6 +11,7 @@ urlpatterns = [
     path("anagrafica/<int:soggetto_id>/mandato/", views_mandati.mandato_nuovo, name="nuovo_mandato"),
     path("mandati/", views_mandati.mandati, name="mandati"),
     path("mandati/nuovo/", views_mandati.mandato_nuovo, name="mandato_nuovo"),
+    path("mandati/leggi-foto/", views_mandati.leggi_foto, name="leggi_foto"),
     path("mandati/importa/", views_mandati.importa_mandati, name="importa_mandati"),
     path("mandati/<int:mandato_id>/", views_mandati.mandato, name="mandato"),
     path("allegati/<int:allegato_id>/", views_mandati.allegato, name="allegato"),

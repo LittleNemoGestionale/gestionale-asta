@@ -13,6 +13,10 @@
   <aside class="visore" id="visore" hidden>
     <div class="comandi"><b style="margin-right:auto">Foto del modulo</b>
       <button data-v="-" title="Rimpicciolisci">−</button><button data-v="1">Adatta</button><button data-v="+" title="Ingrandisci">+</button><button data-v="r" title="Ruota di 90°">Ruota ↻</button></div>
+    <div class="leggi">{% if lettura_claude %}<div><button data-v="sel" class="btn" style="font-size:13px;padding:4px 10px">Leggi la tabella con Claude</button>
+      <button data-v="invia" class="btn sec" style="font-size:13px;padding:4px 10px" hidden>Invia il riquadro a Claude</button></div>
+      <span class="stato">Riquadra solo la tabella degli oggetti: nome e dati del mandante restano fuori e non escono dal computer.</span>
+      {% else %}<span class="stato">Lettura automatica con Claude non attiva (va aggiunta la chiave in impostazioni.ini).</span>{% endif %}</div>
     
     <div class="area"><div style="position:relative"><img alt="Foto del modulo del mandato"></div></div>
   </aside>
@@ -36,7 +40,8 @@
 </form>
 </div></div>
 <script>
-  const vis = Visore(document.getElementById("visore"));
+  const vis = Visore(document.getElementById("visore"), {url: "{% url 'leggi_foto' %}",
+    csrf: document.querySelector("[name=csrfmiddlewaretoken]").value, onRighe: riempiRighe});
   document.getElementById("foto-modulo").addEventListener("change", e => {
     const f = [...e.target.files].find(x => x.type.startsWith("image/") && !/hei[cf]/i.test(x.type));
     document.getElementById("visore").hidden = !f;
