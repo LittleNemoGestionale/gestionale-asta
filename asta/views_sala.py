@@ -217,57 +217,83 @@ COLONNE_AGG = {  # in ordine di preferenza: nel faldone «Prezzo» è la riserva
 }
 
 
+def _voci_aggiudicazioni(nome_file: str, contenuto: bytes) -> list[dict]:
+    """Excel (Lotto, Bis, Aggiudicato, Paletta, Acquirente) o PDF «Valore Agg.» del vecchio gestionale."""
+    import io
+
+    from openpyxl import load_workbook
+    if nome_file.lower().endswith(".pdf"):
+        from .import_pdf import leggi_righe, testo_pdf
+        try:
+            righe = leggi_righe(testo_pdf(contenuto))
+        except Exception:
+            raise ValueError("Non riesco a leggere il PDF.")
+        if not righe:
+            raise ValueError("Nel PDF non trovo righe di lotti con base e valore aggiudicato.")
+        return [{"riga": i, "numero": r["numero"].lower(), "prezzo": r["aggiudicato"], "paletta": "", "acquirente": ""}
+                for i, r in enumerate(righe, start=1)]
+    try:
+        wb = load_workbook(io.BytesIO(contenuto), data_only=True)
+    except Exception:
+        raise ValueError("Il file non è un Excel (.xlsx) o un PDF leggibile.")
+    righe = list(wb.worksheets[0].iter_rows(values_only=True))
+    norm = lambda c: re.sub(r"\s+", " ", str(c or "").strip().lower())  # noqa: E731
+    idx = next((i for i, r in enumerate(righe[:20]) if any(norm(c) in COLONNE_AGG["prezzo"] for c in r)), None)
+    if idx is None:
+        raise ValueError("Nel file non trovo la colonna del prezzo («Aggiudicato», «Valore Agg.» o «Prezzo»).")
+    head = [norm(c) for c in righe[idx]]
+    pos = {k: next((head.index(n) for n in nomi if n in head), None) for k, nomi in COLONNE_AGG.items()}
+    voci = []
+    for n, r in enumerate(righe[idx + 1:], start=idx + 2):
+        get = lambda k: r[pos[k]] if pos[k] is not None and pos[k] < len(r) else None  # noqa: E731
+        num = (str(get("lotto") or "").strip().removesuffix(".0") + str(get("bis") or "").strip()).lower()
+        if num:
+            voci.append({"riga": n, "numero": num, "prezzo": get("prezzo"),
+                         "paletta": str(get("paletta") or "").strip().removesuffix(".0"),
+                         "acquirente": str(get("acquirente") or "").strip()})
+    return voci
+
+
 @login_required
 @permission_required("asta.add_aggiudicazione", raise_exception=True)
 def importa_aggiudicazioni(request, asta_id):
     """Aggiudicazioni da Excel (lotto, paletta, prezzo): per caricare un'asta passata o fare una prova."""
-    import io
-
-    from openpyxl import load_workbook
     asta = get_object_or_404(Asta, pk=asta_id)
     if request.method == "POST" and request.FILES.get("file"):
-        try:
-            wb = load_workbook(io.BytesIO(request.FILES["file"].read()), data_only=True)
-        except Exception:
-            messages.error(request, "Il file non è un Excel (.xlsx) leggibile.")
-            return redirect("importa_aggiudicazioni", asta.pk)
-        righe = list(wb.worksheets[0].iter_rows(values_only=True))
-        norm = lambda c: re.sub(r"\s+", " ", str(c or "").strip().lower())  # noqa: E731
-        idx = next((i for i, r in enumerate(righe[:20]) if any(norm(c) in COLONNE_AGG["prezzo"] for c in r)), None)
-        if idx is None:
-            messages.error(request, "Nel file non trovo la colonna del prezzo («Aggiudicato», «Valore Agg.» o «Prezzo»).")
-            return redirect("importa_aggiudicazioni", asta.pk)
-        head = [norm(c) for c in righe[idx]]
-        pos = {k: next((head.index(n) for n in nomi if n in head), None) for k, nomi in COLONNE_AGG.items()}
+        f = request.FILES["file"]
         predefinita = (request.POST.get("paletta_predefinita") or "").strip()
         invenduti = request.POST.get("invenduti") == "1"
+        try:
+            voci = _voci_aggiudicazioni(f.name, f.read())
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect("importa_aggiudicazioni", asta.pk)
+        if f.name.lower().endswith(".pdf") and not predefinita:
+            messages.error(request, "Il PDF non contiene le palette: scrivi la paletta da usare (es. 1) e ricarica il file.")
+            return redirect("importa_aggiudicazioni", asta.pk)
         lotti = {l.numero.lower(): l for l in asta.lotti.select_related("aggiudicazione")}
         fatti, nuove_palette, errori, n_inv = 0, set(), [], 0
-        for n, r in enumerate(righe[idx + 1:], start=idx + 2):
-            get = lambda k: r[pos[k]] if pos[k] is not None and pos[k] < len(r) else None  # noqa: E731
-            num = (str(get("lotto") or "").strip().removesuffix(".0") + str(get("bis") or "").strip()).lower()
-            if not num:
-                continue
+        for v in voci:
+            n, num, prezzo = v["riga"], v["numero"], v["prezzo"]
             lotto = lotti.get(num)
             if not lotto:
                 errori.append(f"riga {n}: lotto {num} non c'è nell'asta")
                 continue
-            prezzo = get("prezzo")
             if prezzo in (None, "", 0):
                 if invenduti and not hasattr(lotto, "aggiudicazione") and lotto.stato == Lotto.Stato.IN_ASTA:
                     lotto.stato = Lotto.Stato.INVENDUTO
                     lotto.save(update_fields=["stato"])
                     n_inv += 1
                 continue
-            pal = str(get("paletta") or "").strip().removesuffix(".0") or predefinita
+            pal = v["paletta"] or predefinita
             if not pal.isdigit():
                 errori.append(f"riga {n}: lotto {num} senza paletta")
                 continue
             if not Paletta.objects.filter(asta=asta, numero=int(pal)).exists():
-                nome = str(get("acquirente") or "").strip() or f"ACQUIRENTE PALETTA {pal}"
+                nome = v["acquirente"] or f"ACQUIRENTE PALETTA {pal}"
                 gia = Paletta.objects.filter(asta=asta).values_list("acquirente_id", flat=True)
                 acquirente = next((x for x in Soggetto.objects.exclude(pk__in=gia) if x.nome == nome), None) \
-                    if get("acquirente") else None
+                    if v["acquirente"] else None
                 if not acquirente:
                     acquirente = Soggetto.objects.create(
                         tipo="azienda", ragione_sociale=nome, is_cliente=True,

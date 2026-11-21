@@ -1192,3 +1192,42 @@ class ImportaAggiudicazioniTest(TestCase):
         self.assertEqual(Lotto.objects.get(asta=asta, numero="2").stato, Lotto.Stato.INVENDUTO)
         self.assertEqual(Lotto.objects.get(asta=asta, numero="3").stato, Lotto.Stato.IN_ASTA)
         self.assertEqual(Paletta.objects.get(asta=asta, numero=12).acquirente.nome, "ACQUIRENTE PALETTA 12")
+
+
+class ImportaDaPdfEFaldoneTest(TestCase):
+    def setUp(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+
+    def test_leggi_pdf_vecchio_gestionale(self):
+        from .import_pdf import leggi_righe
+        testo = """          Asta N.           93        17/08/2026 -             17/08/2026                   Lotti Disponibili
+Numero Illustratore Titolo Lotto                                     Base d'Asta         Valore Agg.
+     1                                          Bombolo n. 1                       100,00                275,00
+     2                                          Il Piccolo Pinocchio               200,00
+     3                                          Cino e Franco: Il Falso Stregone, Il Ritorno alla Pattuglia dell'Avorio
+                                                                                     175,00             1.150,00
+     3        BIOLETTO, MARTINA                 Topolino e i Grilli Atomici      1.000,00              1.600,00
+   I LOTTI NON AGGIUDICATI POTRANNO ESSERE ACQUISTATI ALLA BASE D'ASTA + IL      18,00 % DEI DIRITTI D'ASTA."""
+        L = leggi_righe(testo)
+        self.assertEqual([(l["numero"], l["base"], l["aggiudicato"]) for l in L],
+                         [("1", D("100"), D("275")), ("2", D("200"), None), ("3", D("175"), D("1150")),
+                          ("3bis", D("1000"), D("1600"))])
+
+    def test_mandanti_dal_faldone(self):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from openpyxl import Workbook
+        wb = Workbook(); ws = wb.active; ws.title = "Foglio1"
+        ws.append(["Tornate", "Lotto", "Bis", "Titolo", "Mandanti", "Mand. N."])
+        ws.append([1, 1, None, "A", "BRUNI MARIO", 4009])
+        ws.append([1, 2, None, "B", "BRUNI MARIO", 4009])
+        ws.append([1, 3, None, "C", "LIBRERIA ALFA", 4010])
+        buf = io.BytesIO(); wb.save(buf)
+        r = self.client.post("/mandanti/da-faldone/", {"file": SimpleUploadedFile("f.xlsx", buf.getvalue())})
+        ris = {x["mandato"].numero: (x["mandato"].mandante.nome, x["mandato"].mandante.tipo, x["lotti"]) for x in r.context["risultato"]}
+        self.assertEqual(ris, {"4009": ("Bruni Mario", "privato", 2), "4010": ("LIBRERIA ALFA", "azienda", 1)})
+        # di nuovo: niente doppioni
+        self.client.post("/mandanti/da-faldone/", {"file": SimpleUploadedFile("f.xlsx", buf.getvalue())})
+        self.assertEqual((Soggetto.objects.filter(is_mandante=True).count(), Mandato.objects.count()), (2, 2))

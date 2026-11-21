@@ -571,3 +571,47 @@ def leggi_foto(request):
         out.append({"descrizione": r["descrizione"].strip(), "riserva": str(riserva) if riserva is not None else "",
                     "note": " · ".join(x for x in note if x)[:250], "incerta": bool(r["incerta"])})
     return JsonResponse({"righe": [r for r in out if r["descrizione"]]})
+
+
+@login_required
+@permission_required("asta.add_soggetto", raise_exception=True)
+def mandanti_da_faldone(request):
+    """Dal faldone (o da un Excel con le colonne Mandanti e Mand. N.) crea le schede dei mandanti
+    e i loro mandati; poi l'anagrafica si completa scheda per scheda."""
+    from openpyxl import load_workbook
+
+    from .import_lotti import mandato_provvisorio
+    risultato = None
+    if request.method == "POST" and request.FILES.get("file"):
+        try:
+            wb = load_workbook(io.BytesIO(request.FILES["file"].read()), data_only=True)
+        except Exception:
+            messages.error(request, "Il file non è un Excel (.xlsx) leggibile.")
+            return redirect("mandanti_da_faldone")
+        ws = wb["Foglio1"] if "Foglio1" in wb.sheetnames else wb.worksheets[0]
+        righe = list(ws.iter_rows(values_only=True))
+        norm = lambda c: re.sub(r"\s+", " ", str(c or "").strip().lower())  # noqa: E731
+        idx = next((i for i, r in enumerate(righe[:20]) if any(norm(c) in ("mandanti", "mandante") for c in r)), None)
+        if idx is None:
+            messages.error(request, "Nel file non trovo la colonna «Mandanti» (o «Mandante»).")
+            return redirect("mandanti_da_faldone")
+        head = [norm(c) for c in righe[idx]]
+        c_nome = next(i for i, h in enumerate(head) if h in ("mandanti", "mandante"))
+        c_num = next((i for i, h in enumerate(head) if h in ("mand. n.", "mand n", "n mandato", "mandato")), None)
+        conteggio = {}
+        for r in righe[idx + 1:]:
+            nome = str(r[c_nome] or "").strip() if c_nome < len(r) else ""
+            num = str(r[c_num] or "").strip().removesuffix(".0") if c_num is not None and c_num < len(r) else ""
+            if nome or num:
+                conteggio[(nome, num)] = conteggio.get((nome, num), 0) + 1
+        prima = set(Soggetto.objects.values_list("pk", flat=True))
+        creati, risultato = {}, []
+        with transaction.atomic():
+            for (nome, num), n in sorted(conteggio.items(), key=lambda x: x[0][0].lower()):
+                m = mandato_provvisorio(nome, None, creati, num)
+                risultato.append({"nome": nome or "(senza nome)", "numero": num, "lotti": n, "mandato": m,
+                                  "nuovo": m.mandante_id not in prima})
+        n_nuovi = len({r["mandato"].mandante_id for r in risultato if r["nuovo"]})
+        messages.success(request, f"{len(risultato)} mandati letti dal file: {n_nuovi} schede mandante nuove da completare, "
+                                  f"{len({r['mandato'].mandante_id for r in risultato}) - n_nuovi} già in anagrafica.")
+    return render(request, "asta/mandanti_da_faldone.html", {"risultato": risultato})

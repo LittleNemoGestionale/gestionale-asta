@@ -4,6 +4,7 @@
 {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
 <div class="azioni" style="justify-content:space-between"><h1 style="margin:0">Mandanti</h1>
   <span>{% if perms.asta.add_soggetto %}<a class="btn" href="{% url 'scheda_nuova' %}?ruolo=mandante">+ Nuovo mandante</a>{% endif %}
+  {% if perms.asta.add_soggetto %}<a class="btn sec" href="{% url 'mandanti_da_faldone' %}">Crea i mandanti dal faldone</a>{% endif %}
   <a class="btn sec" href="{% url 'mandati' %}">Mandati</a></span></div>
 <p class="muted">Chi vi affida materiale da vendere. La scheda è la stessa dell'anagrafica: se il mandante compra anche, basta spuntare «cliente».
   {% if n_da_completare %}<b>{{ n_da_completare }}</b> schede create in automatico (dal catalogo o da Excel) sono da completare.{% endif %}</p>

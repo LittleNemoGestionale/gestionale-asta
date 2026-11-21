@@ -1,0 +1,30 @@
+{% extends "asta/base.html" %}
+{% block title %}Mandanti dal faldone{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<p><a href="{% url 'mandanti_elenco' %}">← Mandanti</a></p>
+<h1>Crea i mandanti dal faldone</h1>
+{% if not risultato %}
+<div class="box">
+  <p>Scegli il faldone di un'asta (o un Excel con le colonne <b>Mandanti</b> e <b>Mand. N.</b>). Per ogni mandante il programma:</p>
+  <ul>
+    <li>lo cerca in anagrafica; se non c'è crea la <b>scheda da completare</b> («ROSSI MARIO» diventa la persona Rossi Mario, «VENERE COMICS» una ditta);</li>
+    <li>crea il <b>mandato con il numero del faldone</b> (Mand. N.), con commissione 15% da verificare.</li>
+  </ul>
+  <p class="muted">I lotti non vengono caricati: per quelli usa «Carica il catalogo» nella pagina Lotti dell'asta, che li abbinerà a questi mandati.</p>
+  <form method="post" enctype="multipart/form-data" class="azioni">{% csrf_token %}
+    <input type="file" name="file" accept=".xlsx" required> <button class="btn">Crea i mandanti</button></form>
+</div>
+{% else %}
+<p>Ora apri ogni scheda <span class="pill mid">nuova</span> e completa l'anagrafica (indirizzo, IBAN, email, cellulare) e la percentuale del mandato.</p>
+<table><thead><tr><th>Mandante</th><th>Mand. N.</th><th class="n">Lotti nel file</th><th></th><th></th></tr></thead><tbody>
+  {% for r in risultato %}<tr>
+    <td><a href="{% url 'scheda' r.mandato.mandante_id %}"><b>{{ r.mandato.mandante.nome }}</b></a>{% if r.nome != r.mandato.mandante.nome %} <span class="muted">(nel file: {{ r.nome }})</span>{% endif %}</td>
+    <td><a href="{% url 'mandato' r.mandato.pk %}">{{ r.mandato.numero }}</a>{% if r.numero and r.numero != r.mandato.numero %} <span class="warn">(nel file {{ r.numero }}: numero già usato da un altro mandante)</span>{% endif %}</td>
+    <td class="n">{{ r.lotti }}</td>
+    <td>{% if r.nuovo %}<span class="pill mid">nuova</span>{% else %}<span class="pill ok">già in anagrafica</span>{% endif %}</td>
+    <td><a href="{% url 'scheda' r.mandato.mandante_id %}">completa la scheda →</a></td></tr>{% endfor %}
+</tbody></table>
+<p><a href="?">Carica un altro file</a></p>
+{% endif %}
+{% endblock %}

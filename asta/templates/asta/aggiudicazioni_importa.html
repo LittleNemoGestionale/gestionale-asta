@@ -13,7 +13,8 @@
     <li>I lotti già aggiudicati restano come sono.</li>
   </ul>
   <form method="post" enctype="multipart/form-data" class="campi" style="grid-template-columns:1fr">{% csrf_token %}
-    <div><label for="f">File Excel</label><input id="f" type="file" name="file" accept=".xlsx" required></div>
+    <div><label for="f">File Excel</label><input id="f" type="file" name="file" accept=".xlsx,.pdf" required>
+      <div class="aiuto">Excel, oppure il PDF «Lotti disponibili / Valore Agg.» stampato dal vecchio gestionale (in quel caso serve la paletta qui sotto).</div></div>
     <div><label for="pp">Paletta da usare quando nel file manca</label><input id="pp" name="paletta_predefinita" inputmode="numeric" placeholder="es. 1 (lascia vuoto per saltare quelle righe)" style="max-width:360px">
       <div class="aiuto">Utile per una prova con un file senza palette: tutte le aggiudicazioni vanno su quella paletta.</div></div>
     <div><label style="text-transform:none;font-size:14px;color:var(--ink)"><input type="checkbox" name="invenduti" value="1" checked> I lotti senza prezzo sono invenduti</label></div>

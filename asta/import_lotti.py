@@ -104,6 +104,7 @@ def leggi_excel(contenuto: bytes, asta) -> list[dict]:
         if riga["valori"]["riserva"] and riga["valori"]["riserva"] == riga["valori"]["base_asta"]:
             riga["valori"]["riserva"] = None
         testo_mandato = str(get("mandato") or "").strip().removesuffix(".0")
+        riga["mandato_numero"] = testo_mandato
         riga["mandante_testo"] = str(get("mandante_testo") or "").strip() or testo_mandato
         m = Mandato.objects.filter(numero__iexact=testo_mandato).select_related("mandante").first() \
             if testo_mandato else None
@@ -256,32 +257,54 @@ def bloccante(r) -> bool:
     return any(not e.startswith(ERRORI_NON_BLOCCANTI) for e in r["errori"])
 
 
-def mandato_provvisorio(testo: str, asta, creati: dict):
-    """Scheda mandante creata dal catalogo (da completare) con un mandato provvisorio."""
+PAROLE_DITTA = re.compile(r"\b(SRL|S\.R\.L|SNC|SAS|SPA|S\.P\.A|COMICS|LIBRERIA|GALLERIA|EDIZIONI|EDITORE|STUDIO|"
+                          r"ASSOCIAZIONE|FONDAZIONE|ARCHIVIO|COLLEZIONE|SHOP|STORE|LTD|GMBH|INC|DITTA|CASA|MANDANTE|ACQUIRENTE)\b", re.I)
+
+
+def nuova_scheda_mandante(testo: str, origine: str):
+    """Scheda da completare: «ROSSI MARIO» → persona Rossi Mario; «VENERE COMICS» → ditta."""
+    from .models import Soggetto
+    parole = testo.split()
+    nota = f"Scheda creata {origine}: completare i dati e verificare la percentuale del mandato."
+    if 2 <= len(parole) <= 3 and testo.upper() == testo and not PAROLE_DITTA.search(testo):
+        return Soggetto.objects.create(tipo="privato", cognome=parole[0].title(),
+                                       nome_proprio=" ".join(parole[1:]).title(), is_mandante=True, note=nota)
+    return Soggetto.objects.create(tipo="azienda", ragione_sociale=testo, is_mandante=True, note=nota)
+
+
+def mandato_provvisorio(testo: str, asta, creati: dict, numero: str = ""):
+    """Mandante dal catalogo/faldone: lo cerca in anagrafica, altrimenti crea la scheda da completare,
+    con il mandato (il «Mand. N.» del faldone, se c'è)."""
     from django.utils import timezone
 
     from .models import Soggetto
     testo = (testo or "").strip() or MANDANTE_SCONOSCIUTO
-    if testo in creati:
-        return creati[testo]
-    sogg = Riconoscitore().trova(testo) if testo != MANDANTE_SCONOSCIUTO else None
-    if sogg is None and testo == MANDANTE_SCONOSCIUTO:
-        sogg = next((x for x in Soggetto.objects.filter(is_mandante=True) if x.nome == testo), None)
+    numero = (numero or "").strip()
+    chiave = (testo, numero)
+    if chiave in creati:
+        return creati[chiave]
+    gia = Mandato.objects.filter(numero=numero).select_related("mandante").first() if numero else None
+    sogg = gia.mandante if gia else None
+    if sogg is None and testo != MANDANTE_SCONOSCIUTO:
+        sogg = Riconoscitore().trova(testo)
     if sogg is None:
-        sogg = Soggetto.objects.create(
-            tipo="azienda", ragione_sociale=testo, is_mandante=True,
-            note=f"Scheda creata dal caricamento del catalogo dell'asta {asta.numero or asta.nome}: "
-                 "completare i dati e verificare la percentuale del mandato.")
-    m = Riconoscitore.mandato_di(sogg, asta)
+        sogg = next((x for x in Soggetto.objects.filter(is_mandante=True) if (x.nome or "").upper() == testo.upper()), None)
+    if sogg is None:
+        sogg = nuova_scheda_mandante(testo, f"dal catalogo dell'asta {asta.numero or asta.nome}" if asta else "dal faldone")
+    m = gia if gia and gia.mandante_id == sogg.pk else None
+    if m is None and not numero:
+        m = Riconoscitore.mandato_di(sogg, asta)
     if m is None:
-        anno = timezone.localdate().year
-        n = Mandato.objects.filter(numero__startswith=f"{anno}/").count() + 1
-        while Mandato.objects.filter(numero=f"{anno}/{n:03d}").exists():
-            n += 1
-        m = Mandato.objects.create(mandante=sogg, numero=f"{anno}/{n:03d}", data=timezone.localdate(),
-                                   commissione_pct=asta.diritti_pct,
-                                   note_accordo="DA VERIFICARE: mandato creato dal caricamento del catalogo.")
-    creati[testo] = m
+        if not numero or Mandato.objects.filter(numero=numero).exists():
+            anno = timezone.localdate().year
+            n = Mandato.objects.filter(numero__startswith=f"{anno}/").count() + 1
+            while Mandato.objects.filter(numero=f"{anno}/{n:03d}").exists():
+                n += 1
+            numero = f"{anno}/{n:03d}"
+        m = Mandato.objects.create(mandante=sogg, numero=numero, data=timezone.localdate(), asta=asta,
+                                   commissione_pct=asta.diritti_pct if asta else 15,
+                                   note_accordo="DA VERIFICARE: mandato creato dal catalogo/faldone, controllare la percentuale.")
+    creati[chiave] = m
     return m
 
 
@@ -301,7 +324,7 @@ def salva(righe: list[dict], asta) -> dict:
         problemi = [e for e in r["errori"] if not e.startswith("mandante da abbinare")] + list(r.get("avvisi", []))
         mandato_id = r["mandato_id"]
         if not mandato_id:
-            m = mandato_provvisorio(r["mandante_testo"], asta, creati)
+            m = mandato_provvisorio(r["mandante_testo"], asta, creati, r.get("mandato_numero", ""))
             mandato_id = m.pk
             esito["mandanti_creati"].setdefault(m.mandante.nome, 0)
             esito["mandanti_creati"][m.mandante.nome] += 1
