@@ -791,7 +791,7 @@ class MandantiPaginaTest(RendicontoMandanteTest):
         self.client.post(self.url, {"azione": "spesa", "mandato": self.mandato.pk, "descrizione": "Foto",
                                     "importo": "15"})
         self.assertEqual(rendiconto_mandante(self.asta, self.m)["totali"]["netto"], D("79.00"))
-        s = SpesaMandante.objects.get(descrizione="Foto")
+        s = SpesaMandante.objects.get(descrizione="Spese foto")
         self.client.post(self.url, {"azione": "togli_spesa", "spesa": s.pk})
         self.assertEqual(rendiconto_mandante(self.asta, self.m)["totali"]["netto"], D("94.00"))
 
@@ -1307,3 +1307,21 @@ class ImpostazioniTest(TestCase):
             import configparser
             cp = configparser.ConfigParser(); cp.optionxform = str; cp.read(Path(d) / "impostazioni.ini")
             self.assertTrue(cp["gestionale"]["CASA_ASTA_INTESTAZIONE"].endswith("Sconto 10%"))
+
+
+class SpeseRendicontoTest(TestCase):
+    def test_spese_e_inserimento_dal_rendiconto(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        asta = Asta.objects.create(numero=100, nome="Prova", data=date(2099, 1, 1))
+        s = Soggetto.objects.create(nome_proprio="Giovanni", cognome="Bianchi", is_mandante=True)
+        m = Mandato.objects.create(mandante=s, numero="4021", data=date.today(), commissione_pct=18)
+        for n in ("1", "2", "3"):
+            Lotto.objects.create(asta=asta, numero=n, mandato=m)
+        url = f"/asta/{asta.pk}/mandanti/"
+        self.client.post(url, {"azione": "spesa", "mandato": m.pk, "descrizione": "piccolo restauro", "importo": "20"})
+        self.client.post(url, {"azione": "inserimento", "mandato": m.pk, "valore": "8"})
+        m.refresh_from_db()
+        self.assertEqual((m.spesa_inserimento, m.spese.get().descrizione), (D("8"), "Spese piccolo restauro"))
+        r = rendiconto_mandante(asta, s)
+        self.assertEqual(r["totali"]["spese"], D("44"))  # 3 lotti × 8 € + 20 €

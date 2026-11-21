@@ -38,15 +38,20 @@
       <td class="n">{{ x.r.totali.martello|euro }}</td>
       <td class="n">{{ x.r.totali.commissione|euro }}{% if x.r.totali.iva_commissione %}<br><span class="muted" style="font-size:12px">+ IVA {{ x.r.totali.iva_commissione|euro }}</span>{% endif %}</td>
       <td>{{ x.r.totali.spese|euro }}
-        <ul class="spese">{% for i in x.r.inserimenti %}<li>inserimento {{ i.n }} × {{ i.unitario|euro }}</li>{% endfor %}
+        <ul class="spese">{% for i in x.r.inserimenti %}<li>inserimento {{ i.n }} lotti × {{ i.unitario|euro }}</li>{% endfor %}
           {% for s in x.r.spese %}<li>{{ s.descrizione }} {{ s.importo|euro }}
-            <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="azione" value="togli_spesa"><input type="hidden" name="spesa" value="{{ s.pk }}"><button title="togli">✕</button></form></li>{% endfor %}</ul>
-        <details><summary>+ aggiungi spesa</summary>
-          <form method="post" class="agg-spesa">{% csrf_token %}<input type="hidden" name="azione" value="spesa">
-            {% if x.mandati|length > 1 %}<select name="mandato" aria-label="mandato">{% for md in x.mandati %}<option value="{{ md.pk }}">{{ md.numero }}</option>{% endfor %}</select>{% else %}<input type="hidden" name="mandato" value="{{ x.mandati.0.pk }}">{% endif %}
-            <input name="descrizione" placeholder="es. Spese piccolo restauro" required style="width:170px" aria-label="descrizione spesa">
-            <input name="importo" placeholder="€" required inputmode="decimal" style="width:60px" aria-label="importo">
-            <button class="btn sec" style="padding:2px 8px">Aggiungi</button></form></details></td>
+            <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="azione" value="togli_spesa"><input type="hidden" name="spesa" value="{{ s.pk }}"><button title="togli questa spesa">✕</button></form></li>{% endfor %}</ul>
+        {% if perms.asta.change_mandato %}
+        <form method="post" class="agg-spesa">{% csrf_token %}<input type="hidden" name="azione" value="spesa">
+          {% if x.mandati|length > 1 %}<select name="mandato" aria-label="mandato">{% for md in x.mandati %}<option value="{{ md.pk }}">{{ md.numero }}</option>{% endfor %}</select>{% else %}<input type="hidden" name="mandato" value="{{ x.mandati.0.pk }}">{% endif %}
+          <input name="descrizione" list="dl-spese" placeholder="restauro, foto…" required style="width:150px" aria-label="descrizione della spesa">
+          <input name="importo" placeholder="€" required inputmode="decimal" style="width:60px" aria-label="importo">
+          <button class="btn sec" style="padding:2px 8px">+ Spesa</button></form>
+        {% for md in x.mandati %}<form method="post" class="agg-spesa">{% csrf_token %}<input type="hidden" name="azione" value="inserimento"><input type="hidden" name="mandato" value="{{ md.pk }}">
+          <span class="muted" style="font-size:12px">inserimento{% if x.mandati|length > 1 %} ({{ md.numero }}){% endif %} €</span>
+          <input name="valore" value="{{ md.spesa_inserimento|floatformat:'-2' }}" inputmode="decimal" style="width:48px" aria-label="spese di inserimento per lotto">
+          <span class="muted" style="font-size:12px">a lotto</span><button class="btn sec" style="padding:2px 8px">Salva</button></form>{% endfor %}
+        {% endif %}</td>
       <td class="n"><b>{{ x.r.totali.netto|euro }}</b></td>
       <td class="n">{% if x.pagato %}{{ x.pagato|euro }}{% if x.residuo > 0 %}<br><span class="warn" style="font-size:12px">resta {{ x.residuo|euro }}</span>{% else %}<br><span class="pill ok">pagato</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td style="white-space:nowrap"><a href="{% url 'pdf_mandante' asta.pk x.m.pk %}">PDF</a> · <a href="{% url 'email_mandante' asta.pk x.m.pk %}">Email</a> · <a href="{% url 'eml_mandante' asta.pk x.m.pk %}">Outlook</a>
@@ -56,5 +61,6 @@
     </tr>
   {% empty %}<tr><td colspan="8" class="muted">Nessun mandante con lotti in questa asta.</td></tr>{% endfor %}</tbody>
 </table></div>
-<p class="muted">Le spese di inserimento (10 € a lotto) si possono cambiare per ogni mandato, se l'accordo è diverso. Il numero di riferimento del rendiconto è assegnato la prima volta che lo si scarica o invia.</p>
+<datalist id="dl-spese"><option value="Spese piccolo restauro"><option value="Spese di restauro"><option value="Spese fotografiche"><option value="Spese di trasporto"><option value="Spese di perizia"></datalist>
+<p class="muted">Le spese si sottraggono a quanto riceve il mandante e compaiono nelle Note del rendiconto («SPESE INSERIMENTO LOTTI NR. 5 x 10€ = 50€», «ADDEBITO SPESE PICCOLO RESTAURO = 20€»). Le spese di inserimento (10 € a lotto, venduto o no) si cambiano per ogni mandato se l'accordo è diverso; 0 = non addebitarle. Il numero di riferimento del rendiconto è assegnato la prima volta che lo si scarica o invia.</p>
 {% endblock %}

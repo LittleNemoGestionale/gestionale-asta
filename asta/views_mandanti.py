@@ -52,11 +52,26 @@ def mandanti(request, asta_id):
             except InvalidOperation:
                 importo = None
             descr = (request.POST.get("descrizione") or "").strip()
+            if descr and not descr.lower().startswith(("spese", "spesa")):
+                descr = f"Spese {descr[0].lower()}{descr[1:]}"  # nel PDF: «ADDEBITO SPESE PICCOLO RESTAURO = 20€»
             if not descr or not importo or importo <= 0:
                 messages.error(request, "Per aggiungere una spesa servono descrizione e importo.")
             else:
                 SpesaMandante.objects.create(asta=asta, mandato=mandato, descrizione=descr[:120], importo=importo)
                 messages.success(request, f"Spesa «{descr}» di € {importo} aggiunta a {mandato.mandante.nome}.")
+            return redirect(f"{request.path}#m{mandato.mandante_id}")
+        if azione == "inserimento":
+            mandato = get_object_or_404(Mandato, pk=request.POST.get("mandato"))
+            try:
+                valore = Decimal((request.POST.get("valore") or "0").replace("€", "").replace(",", ".").strip() or "0")
+            except InvalidOperation:
+                valore = None
+            if valore is None or valore < 0:
+                messages.error(request, "Scrivi l'importo per lotto, es. 10 (0 = non addebitare).")
+            else:
+                mandato.spesa_inserimento = valore
+                mandato.save(update_fields=["spesa_inserimento"])
+                messages.success(request, f"Mandato {mandato.numero}: spese di inserimento a € {valore} per lotto.")
             return redirect(f"{request.path}#m{mandato.mandante_id}")
         if azione == "togli_spesa":
             s = get_object_or_404(SpesaMandante, pk=request.POST.get("spesa"), asta=asta)
