@@ -1083,3 +1083,19 @@ class OfferteTelefoniTest(TestCase):
         ws = load_workbook(io.BytesIO(r.content))["SERGIO"]
         riga = next(row for row in ws.iter_rows(values_only=True) if row[0] == 12)
         self.assertEqual(riga[5:8], ("201: 150", "TEL 301", None))
+
+
+class IncollaDaExcelTest(TestCase):
+    def test_incolla_con_titoli_ed_euro(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        s = Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        testo = ("Descrizione\tCategoria\tStima min\tStima max\tRiserva\tNote\n"
+                 "A. Pazienza – Ritratti\t\t\t\t70 €\tq.tà 1\n"
+                 "A. Pazienza – Il cavaliere; serigrafia\tGrafica e stampe\t\t\t1.500 €\tq.tà 1\n")
+        self.client.post("/mandati/nuovo/", {"mandante": s.pk, "numero": "2099/060", "data": "2099-01-01",
+                                             "commissione_pct": "15", "spesa_inserimento": "10", "incolla": testo})
+        m = Mandato.objects.get(numero="2099/060")
+        self.assertEqual([(o.descrizione, o.categoria, o.riserva, o.note) for o in m.oggetti.all()],
+                         [("A. Pazienza – Ritratti", "", D("70"), "q.tà 1"),
+                          ("A. Pazienza – Il cavaliere; serigrafia", "Grafica e stampe", D("1500"), "q.tà 1")])

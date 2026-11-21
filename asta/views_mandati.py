@@ -79,7 +79,10 @@ def righe_da_post(post) -> tuple[list[dict], list[str]]:
     for n, riga in enumerate((post.get("incolla") or "").splitlines(), start=1):
         if not riga.strip():
             continue
-        parti = [p.strip() for p in re.split(r"\t|;|\|", riga)]
+        # copiato da Excel = separato da tabulazioni (allora «;» può stare nella descrizione)
+        parti = [p.strip() for p in (riga.split("\t") if "\t" in riga else re.split(r";|\|", riga))]
+        if parti[0].lower() in ("descrizione", "descrizione oggetto", "oggetto"):
+            continue  # riga dei titoli copiata insieme ai dati
         righe.append(dict(zip(CAMPI_RIGA, parti + [""] * len(CAMPI_RIGA))))
     puliti = []
     for n, r in enumerate(righe, start=1):
