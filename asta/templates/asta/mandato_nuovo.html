@@ -5,7 +5,7 @@
 <h1>Nuovo mandato{% if s and not mandanti %} · {{ s.nome }}{% endif %}</h1>
 <p class="muted">Il mandato è il materiale affidato da un mandante: qui segnate la commissione concordata, lo stato del materiale, la destinazione e l'elenco degli oggetti (si possono aggiungere anche dopo).</p>
 {% if errori %}<div class="msg error">{{ errori|join:" · " }}</div>{% endif %}
-<form method="post">{% csrf_token %}
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
   <div class="campi box" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 16px">
     {% if mandanti or not s %}<div style="grid-column:1/-1"><label>Mandante</label>
       <select name="mandante" required style="width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px"><option value="">— scegli —</option>
@@ -15,6 +15,10 @@
       {% if f.field.widget.input_type == 'checkbox' %}<label>{{ f }} {{ f.label }}</label>{% else %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% endif %}{{ f.errors }}</div>{% endfor %}
   </div>
   <h2>Oggetti del mandato</h2>
+  <div class="box" style="margin-bottom:12px"><b>Da un file Excel:</b> <input type="file" name="file" accept=".xlsx">
+    <div class="muted" style="font-size:12px;margin-top:4px">Una riga per oggetto. Colonne riconosciute: Descrizione (obbligatoria), Categoria, Stima min, Stima max, Riserva, Note.
+      La riga dei titoli può essere anche più in basso. Le altre colonne vengono ignorate.</div></div>
+  <p class="muted">Oppure scrivi gli oggetti qui sotto (puoi usare anche entrambi):</p>
   {% include "asta/_righe_oggetti.html" %}
   <div class="azioni"><button class="btn">Registra mandato</button></div>
 </form>

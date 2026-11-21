@@ -908,6 +908,24 @@ class MandatiMagazzinoTest(TestCase):
         r = self.client.get("/mandati/?arrivo=da_ritirare")
         self.assertContains(r, "2099/001")
 
+    def test_nuovo_mandato_da_excel(self):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from openpyxl import Workbook
+        wb = Workbook(); ws = wb.active
+        ws.append(["Materiale consegnato"])
+        ws.append(["Oggetto", "Stima", "Note"])
+        ws.append(["Tex n. 1 originale", 500, "copertina staccata"])
+        ws.append(["Zagor n. 1", "80", ""])
+        buf = io.BytesIO(); wb.save(buf)
+        self.client.post("/mandati/nuovo/", {
+            "mandante": self.bruni.pk, "numero": "2099/050", "data": "2099-01-01", "commissione_pct": "15",
+            "spesa_inserimento": "10", "file": SimpleUploadedFile("mandato.xlsx", buf.getvalue())})
+        m = Mandato.objects.get(numero="2099/050")
+        self.assertEqual([(o.descrizione, o.stima_min, o.note) for o in m.oggetti.all()],
+                         [("Tex n. 1 originale", D("500"), "copertina staccata"), ("Zagor n. 1", D("80"), "")])
+
     def test_destinazione_consegne_e_asta(self):
         m = Mandato.objects.create(mandante=self.bruni, numero="2099/002", data=date.today(), commissione_pct=15,
                                    destinazione="asta_futura")

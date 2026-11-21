@@ -27,7 +27,8 @@
 <h2>Aggiungi oggetti</h2>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}
   {% include "asta/_righe_oggetti.html" %}
-  <p>Oppure da un file Excel (colonne Descrizione, Categoria, Stima min, Stima max, Riserva, Note): <input type="file" name="file" accept=".xlsx"></p>
+  <div class="box" style="margin:12px 0"><b>Oppure da un file Excel:</b> <input type="file" name="file" accept=".xlsx">
+    <div class="muted" style="font-size:12px;margin-top:4px">Una riga per oggetto, colonne Descrizione, Categoria, Stima min, Stima max, Riserva, Note.</div></div>
   <div class="azioni"><button class="btn" name="azione" value="aggiungi">Aggiungi al mandato</button></div>
 </form>
 {% endif %}

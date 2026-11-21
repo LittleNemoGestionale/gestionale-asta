@@ -221,6 +221,14 @@ def mandato_nuovo(request, soggetto_id=None):
     righe, errori = ([], [])
     if request.method == "POST":
         righe, errori = righe_da_post(request.POST)
+        if request.FILES.get("file"):
+            try:
+                r_file, e_file = leggi_excel_oggetti(request.FILES["file"].read())
+                righe += [{k: r[k] for k in ("descrizione", "categoria", "note", "stima_min", "stima_max", "riserva")}
+                          for r in r_file]
+                errori += e_file
+            except ValueError as e:
+                errori.append(f"file Excel: {e}")
         if not s:
             errori.insert(0, "scegli il mandante")
         if form.is_valid() and not errori:
