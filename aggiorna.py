@@ -59,9 +59,16 @@ def aggiorna(silenzioso=False) -> bool:
         if not silenzioso:
             scrivi(f"Il programma è già aggiornato ({versione_attuale()}).")
         return False
-    if git("status", "--porcelain", "--untracked-files=no").stdout.strip():
-        scrivi("Aggiornamento sospeso: alcuni file del programma sono stati modificati a mano. Contattare l'assistenza.")
-        return False
+    if os.name == "nt":
+        git("config", "core.fileMode", "false")  # Windows non ha i permessi «eseguibile» dei file
+    modificati = git("status", "--porcelain", "--untracked-files=no").stdout.strip()
+    if modificati:
+        # file del programma cambiati sul posto (fine riga, copie da zip…): li salvo e rimetto quelli originali.
+        # La cartella «dati» non è mai toccata.
+        copia = DATI / f"modifiche-locali-{datetime.now():%Y%m%d-%H%M}.patch"
+        copia.write_text(git("diff").stdout, encoding="utf-8")
+        git("reset", "--hard", "HEAD")
+        scrivi(f"Alcuni file del programma erano diversi dall'originale: ripristinati (copia in {copia.name}).")
 
     scrivi(f"Trovata una versione nuova: aggiorno da {prima[:7]} a {nuova[:7]}.")
     b = django_comando("backup_completo")
