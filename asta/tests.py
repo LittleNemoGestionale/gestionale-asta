@@ -1231,3 +1231,21 @@ Numero Illustratore Titolo Lotto                                     Base d'Asta
         # di nuovo: niente doppioni
         self.client.post("/mandanti/da-faldone/", {"file": SimpleUploadedFile("f.xlsx", buf.getvalue())})
         self.assertEqual((Soggetto.objects.filter(is_mandante=True).count(), Mandato.objects.count()), (2, 2))
+
+
+class MandanteDeiLottiTest(TestCase):
+    def test_assegna_mandante_ai_selezionati(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        asta = Asta.objects.create(numero=93, nome="Prova", data=date(2099, 1, 1))
+        da = Soggetto.objects.create(tipo="azienda", ragione_sociale="MANDANTE DA ABBINARE", is_mandante=True)
+        vero = Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        m_da = Mandato.objects.create(mandante=da, numero="2099/001", data=date.today(), commissione_pct=18)
+        m_vero = Mandato.objects.create(mandante=vero, numero="4009", data=date.today(), commissione_pct=15)
+        l1 = Lotto.objects.create(asta=asta, numero="1", mandato=m_da, note_interne="DA VERIFICARE: mandante mancante. MANCA")
+        l2 = Lotto.objects.create(asta=asta, numero="2", mandato=m_da)
+        r = self.client.get(f"/asta/{asta.pk}/lotti/")
+        self.assertEqual([(m.numero, m.n) for m in r.context["mandati_presenti"]], [("2099/001", 2)])
+        self.client.post(f"/asta/{asta.pk}/lotti/", {"azione": "cambia_mandato", "sel": [l1.pk], "nuovo_mandato": m_vero.pk})
+        l1.refresh_from_db(); l2.refresh_from_db()
+        self.assertEqual((l1.mandato, l1.note_interne, l2.mandato), (m_vero, "MANCA", m_da))

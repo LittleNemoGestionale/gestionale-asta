@@ -51,10 +51,42 @@
 <div class="azioni" style="justify-content:space-between"><h2 style="margin:0">Catalogo</h2>
   <span>{% if n_verifica %}{% if solo_verifica %}<a href="?">Mostra tutti</a>{% else %}<a href="?verifica=1" class="warn">{{ n_verifica }} da verificare</a>{% endif %} · {% endif %}{% if n_foto %}{% if solo_foto %}<a href="?">Mostra tutti</a>{% else %}<a href="?foto=1">{{ n_foto }} da fotografare</a>{% endif %}{% endif %}
   {% if not puo or asta.chiusa %} · <a href="{% url 'faldone' asta.pk %}">Scarica il faldone</a>{% endif %}</span></div>
+{% if puo and not asta.chiusa and lotti %}
+<form method="post" id="form-mandante" class="box barra-mand noprint">{% csrf_token %}
+  <b>Mandante dei lotti</b>
+  <div class="riga">
+    <span>Seleziona:</span>
+    <button type="button" class="btn sec" onclick="scegli(() => true)">tutti</button>
+    <button type="button" class="btn sec" onclick="scegli(() => false)">nessuno</button>
+    <select id="sel-di" onchange="if (this.value) scegli(c => c.dataset.mandato === this.value); this.value=''">
+      <option value="">i lotti del mandante…</option>
+      {% for m in mandati_presenti %}<option value="{{ m.pk }}">{% if perms.asta.view_dati_personali %}{{ m.mandante.nome }}{% else %}{{ m.mandante.codice }}{% endif %} · {{ m.numero }} ({{ m.n }} lotti)</option>{% endfor %}
+    </select>
+    <span class="muted" id="n-sel">0 selezionati</span>
+  </div>
+  <div class="riga">
+    <span>Assegna a:</span>
+    <select name="nuovo_mandato" required>
+      <option value="">— scegli il mandante / mandato —</option>
+      {% for m in mandati %}<option value="{{ m.pk }}">{% if perms.asta.view_dati_personali %}{{ m.mandante.nome }}{% else %}{{ m.mandante.codice }}{% endif %} · mandato {{ m.numero }} ({{ m.commissione_pct|floatformat:0 }}%)</option>{% endfor %}
+    </select>
+    <button class="btn" name="azione" value="cambia_mandato">Assegna ai lotti selezionati</button>
+    {% if perms.asta.add_mandato %}<a href="{% url 'mandato_nuovo' %}?asta={{ asta.pk }}">manca? nuovo mandato</a>{% endif %}
+  </div>
+</form>
+<style>.barra-mand{display:grid;gap:8px;margin:10px 0}.barra-mand .riga{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.barra-mand select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;max-width:100%}
+.barra-mand .btn.sec{padding:4px 10px}</style>
+<script>
+  function conta() { document.getElementById("n-sel").textContent = document.querySelectorAll("input.sel-lotto:checked").length + " selezionati"; }
+  function scegli(regola) { document.querySelectorAll("input.sel-lotto").forEach(c => c.checked = regola(c)); conta(); }
+  document.addEventListener("change", e => { if (e.target.matches("input.sel-lotto, #sel-tutti")) conta(); });
+</script>
+{% endif %}
 <div class="scroll"><table>
-  <thead><tr><th>Lotto</th>{% if asta.numero_tornate > 1 %}<th>Tornata</th>{% endif %}<th>Descrizione</th><th>Mandante</th><th class="n">Base</th><th class="n">Stima</th><th class="n">Riserva</th><th class="n">Comm.</th><th>Stato</th><th></th></tr></thead>
+  <thead><tr>{% if puo and not asta.chiusa %}<th class="noprint"><input type="checkbox" id="sel-tutti" title="Seleziona tutti" onclick="for (const c of document.querySelectorAll('input.sel-lotto')) c.checked=this.checked"></th>{% endif %}<th>Lotto</th>{% if asta.numero_tornate > 1 %}<th>Tornata</th>{% endif %}<th>Descrizione</th><th>Mandante</th><th class="n">Base</th><th class="n">Stima</th><th class="n">Riserva</th><th class="n">Comm.</th><th>Stato</th><th></th></tr></thead>
   <tbody>{% for l in lotti %}
-    <tr><td><b>{{ l.numero }}</b></td>{% if asta.numero_tornate > 1 %}<td>{{ l.tornata|default:"" }}</td>{% endif %}
+    <tr>{% if puo and not asta.chiusa %}<td class="noprint"><input type="checkbox" class="sel-lotto" name="sel" value="{{ l.pk }}" form="form-mandante" data-mandato="{{ l.mandato_id }}" aria-label="Seleziona il lotto {{ l.numero }}"></td>{% endif %}<td><b>{{ l.numero }}</b></td>{% if asta.numero_tornate > 1 %}<td>{{ l.tornata|default:"" }}</td>{% endif %}
       <td>{% ifchanged l.sezione %}{% if l.sezione %}<span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">{{ l.sezione }}</span><br>{% endif %}{% endifchanged %}
         {% if l.titolo %}<b>{{ l.titolo }}</b>{% if l.illustratore %} <span class="muted">· {{ l.illustratore }}</span>{% endif %}<br><span class="muted" style="font-size:12.5px">{{ l.descrizione|truncatechars:90 }}</span>{% else %}{{ l.descrizione|truncatechars:80 }}{% endif %}
         {% if l.note_interne %}<br><i class="muted" style="font-size:12px">{{ l.note_interne }}</i>{% endif %}{% if l.da_fotografare %} <span style="font-size:11px;background:#e7eefb;color:#1d4c9b;padding:1px 6px;border-radius:8px">da fotografare</span>{% endif %}{% if l.lotto_origine %}<br><span class="muted">riproposto dall'asta {{ l.lotto_origine.asta.numero|default:l.lotto_origine.asta.nome }}, lotto {{ l.lotto_origine.numero }}</span>{% endif %}</td>
@@ -66,6 +98,6 @@
       <td class="n noprint">{% if puo %}<a href="/admin/asta/lotto/{{ l.pk }}/change/">modifica</a>{% if l.stato == 'in_asta' %}
         <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="azione" value="elimina"><input type="hidden" name="lotto" value="{{ l.pk }}">
           · <button style="background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0" onclick="return confirm('Eliminare il lotto {{ l.numero }}?')">elimina</button></form>{% endif %}{% endif %}</td></tr>
-  {% empty %}<tr><td colspan="9" class="muted">Nessun lotto. Aggiungili qui sopra, da Excel, o riproponi gli invenduti.</td></tr>{% endfor %}</tbody>
+  {% empty %}<tr><td colspan="10" class="muted">Nessun lotto. Aggiungili qui sopra, da Excel, o riproponi gli invenduti.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endblock %}

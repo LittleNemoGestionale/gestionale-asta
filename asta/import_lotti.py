@@ -338,4 +338,7 @@ def salva(righe: list[dict], asta) -> dict:
             oggetto_id=r.get("oggetto_id") if mandato_id == r["mandato_id"] else None,
             **{k: (Decimal(v) if v is not None else None) for k, v in r["valori"].items()})
         esito["caricati"] += 1
+    # i mandati usati senza un'asta indicata diventano «mandati per questa asta»
+    usati = set(asta.lotti.values_list("mandato_id", flat=True))
+    Mandato.objects.filter(pk__in=usati, asta=None).update(asta=asta)
     return esito

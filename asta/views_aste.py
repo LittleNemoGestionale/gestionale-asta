@@ -180,6 +180,24 @@ def lotti_asta(request, asta_id):
     ultima_tornata = asta.lotti.exclude(tornata=None).order_by("-ordine").values_list("tornata", flat=True).first()
     form = LottoForm(initial={"numero": prossimo_numero_lotto(asta), "tornata": ultima_tornata or 1})
     if request.method == "POST" and puo:
+        if request.POST.get("azione") == "cambia_mandato":
+            nuovo = Mandato.objects.select_related("mandante").filter(pk=request.POST.get("nuovo_mandato") or 0).first()
+            sel = asta.lotti.filter(pk__in=request.POST.getlist("sel"))
+            if asta.chiusa:
+                messages.error(request, "L'asta è conclusa: i mandanti dei lotti non si cambiano più.")
+            elif not nuovo or not sel.exists():
+                messages.error(request, "Spunta almeno un lotto e scegli il mandante.")
+            else:
+                n = 0
+                for l in sel:
+                    l.mandato = nuovo
+                    l.note_interne = re.sub(r"(DA VERIFICARE: )?mandante (mancante|da abbinare)\.?\s*", "", l.note_interne).strip()
+                    if l.note_interne in ("DA VERIFICARE:", "DA VERIFICARE: ."):
+                        l.note_interne = ""
+                    l.save()
+                    n += 1
+                messages.success(request, f"{n} lotti assegnati a {nuovo.mandante.nome} (mandato {nuovo.numero}).")
+            return redirect("lotti_asta", asta.pk)
         if request.POST.get("azione") == "elimina":
             l = get_object_or_404(Lotto, pk=request.POST.get("lotto"), asta=asta)
             if hasattr(l, "aggiudicazione"):
@@ -218,6 +236,14 @@ def lotti_asta(request, asta_id):
     mandati = Mandato.objects.select_related("mandante").order_by("mandante__codice", "-data")
     from .views_mandati import con_lotti
     mandati_asta = list(asta.mandati_ricevuti.select_related("mandante").order_by("numero"))
+    presenti = {}
+    for l in lotti:
+        presenti.setdefault(l.mandato_id, [l.mandato, 0])[1] += 1
+    mandati_presenti = []
+    for m, n in presenti.values():
+        m.n = n
+        mandati_presenti.append(m)
+    mandati_presenti.sort(key=lambda m: (m.mandante.nome or "").lower())
     oggetti = con_lotti(Oggetto.objects.filter(mandato__in=mandati_asta))
     for m in mandati_asta:
         propri = [o for o in oggetti if o.mandato_id == m.pk]
@@ -227,6 +253,7 @@ def lotti_asta(request, asta_id):
     da_assegnare = [o.pk for o in oggetti if o.disponibile]
     return render(request, "asta/lotti.html", {"asta": asta, "lotti": lotti, "form": form, "puo": puo,
                                                "mandati_asta": mandati_asta, "da_assegnare": da_assegnare,
+                                               "mandati_presenti": mandati_presenti,
                                                "mandati": mandati, "n_foto": n_foto, "n_verifica": n_verifica,
                                                "solo_foto": bool(request.GET.get("foto")),
                                                "solo_verifica": bool(request.GET.get("verifica"))})
