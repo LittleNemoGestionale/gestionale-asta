@@ -8,7 +8,7 @@ where py >nul 2>nul || where python >nul 2>nul || (
 )
 if not exist venv (
   echo Prima installazione: preparo il programma, ci vuole qualche minuto...
-  py -3 -m venv venv || python -m venv venv
+  py -V:3.13 -m venv venv || py -3 -m venv venv || python -m venv venv
   venv\Scripts\python -m pip install -r requirements.txt
 )
 venv\Scripts\python avvia.py
