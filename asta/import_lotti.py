@@ -6,8 +6,8 @@ import io
 import re
 from decimal import Decimal, InvalidOperation
 
-from .import_word import Riconoscitore, leggi_catalogo_word
-from .models import Lotto, Mandato
+from .import_word import Riconoscitore, _parole, leggi_catalogo_word
+from .models import Lotto, Mandato, Oggetto
 
 COLONNE = {
     "numero": ["lotto", "n lotto", "nr lotto", "numero", "n."],
@@ -140,8 +140,74 @@ def leggi_file(nome: str, contenuto: bytes, asta) -> tuple[str, list[dict]]:
     raise ValueError("Formato non riconosciuto: carica un catalogo Word (.docx) o un Excel (.xlsx).")
 
 
+PAROLE_VUOTE = {"DI", "DEL", "DELLA", "DEI", "DELLE", "CON", "PER", "UNA", "UNO", "THE", "AND", "LOTTO", "COMPOSTO",
+                "DA", "IN", "SU", "AL", "ALLA", "NEL", "NELLA", "CM", "NN", "IL", "LO", "LA", "LE", "GLI", "ED"}
+
+
+def _chiavi(testo: str) -> set[str]:
+    testo = re.sub(r"[’‘'`´]", " ", testo or "")  # «L’Astronave» = «L'Astronave»
+    return {p for p in _parole(testo) if (len(p) > 2 or p.isdigit()) and p not in PAROLE_VUOTE}
+
+
+def _somiglianza(a: set, b: set) -> float:
+    if not a or not b:
+        return 0.0
+    comuni = len(a & b)
+    return 0.5 * comuni / len(a | b) + 0.5 * comuni / min(len(a), len(b))
+
+
+def abbina_oggetti(righe: list[dict], asta, scelte: dict[int, str] | None = None) -> None:
+    """Collega ogni lotto del catalogo all'oggetto ricevuto con il mandato (stesso mandante, descrizione simile).
+
+    Sicuro → collegato da solo; dubbio → proposto, da confermare nell'anteprima; scelte = decisioni dell'utente."""
+    scelte = scelte or {}
+    mandanti = {m.pk: m.mandante_id for m in Mandato.objects.filter(pk__in={r["mandato_id"] for r in righe if r["mandato_id"]})}
+    gia_in_asta = set(asta.lotti.exclude(oggetto=None).values_list("oggetto_id", flat=True))
+    per_mandante = {}
+    for o in (Oggetto.objects.filter(mandato__mandante_id__in=set(mandanti.values()), restituito_il=None)
+              .select_related("mandato").prefetch_related("lotti__asta", "lotti__aggiudicazione")):
+        if o.pk in gia_in_asta:
+            continue
+        o._lotti = sorted(o.lotti.all(), key=lambda l: (l.asta.data, l.pk))
+        if o.disponibile:
+            per_mandante.setdefault(o.mandato.mandante_id, []).append((o, _chiavi(o.descrizione)))
+    usati = {int(v) for v in scelte.values() if v and str(v).isdigit()}
+    for i, r in enumerate(righe):
+        r["oggetto_id"], r["oggetto"], r["oggetto_candidati"], r["oggetto_dubbio"] = None, "", [], False
+        if r["escluso"] or not r["mandato_id"]:
+            continue
+        testo = _chiavi(" ".join([r["titolo"], r.get("illustratore", ""), r["descrizione"][:400]]))
+        titolo = _chiavi(" ".join([r["titolo"], r.get("illustratore", "")]))
+        punteggi = []
+        for o, chiavi in per_mandante.get(mandanti.get(r["mandato_id"]), []):
+            p = max(_somiglianza(testo, chiavi), _somiglianza(titolo, chiavi))
+            v = r["valori"]
+            if o.stima_max and v.get("stima_max") and Decimal(v["stima_max"]) == o.stima_max:
+                p += 0.2
+            if o.riserva and v.get("riserva") and Decimal(v["riserva"]) == o.riserva:
+                p += 0.1
+            if p >= 0.2:
+                punteggi.append((p, o))
+        punteggi.sort(key=lambda x: -x[0])
+        r["oggetto_candidati"] = [(o.pk, f"{o.codice} · {o.descrizione[:60]}") for _, o in punteggi[:4]]
+        if i in scelte:  # deciso a mano nell'anteprima
+            scelto = next((o for _, o in punteggi if str(o.pk) == str(scelte[i])), None)
+            if scelte[i] and not scelto:
+                scelto = Oggetto.objects.filter(pk=scelte[i]).select_related("mandato").first()
+                if scelto:
+                    r["oggetto_candidati"].insert(0, (scelto.pk, f"{scelto.codice} · {scelto.descrizione[:60]}"))
+        else:
+            liberi = [(p, o) for p, o in punteggi if o.pk not in usati]
+            sicuro = liberi and liberi[0][0] >= 0.5 and (len(liberi) == 1 or liberi[0][0] - liberi[1][0] >= 0.15)
+            scelto = liberi[0][1] if sicuro else None
+            r["oggetto_dubbio"] = bool(liberi) and not sicuro
+        if scelto:
+            usati.add(scelto.pk)
+            r["oggetto_id"], r["oggetto"] = scelto.pk, scelto.codice
+
+
 def controlla(righe: list[dict], asta, abbinamenti: dict[str, int] | None = None,
-              inizi_tornate: dict[int, int] | None = None) -> list[dict]:
+              inizi_tornate: dict[int, int] | None = None, scelte_oggetti: dict[int, str] | None = None) -> list[dict]:
     """Applica abbinamenti dei mandanti e tornate, e ricalcola gli errori bloccanti."""
     esistenti = set(asta.lotti.values_list("numero", flat=True))
     visti = set()
@@ -177,6 +243,7 @@ def controlla(righe: list[dict], asta, abbinamenti: dict[str, int] | None = None
                 r["tornata"] = max([t for t, da in inizi_tornate.items() if da and n >= da], default=1)
             except (AttributeError, ValueError):
                 pass
+    abbina_oggetti(righe, asta, scelte_oggetti)
     return righe
 
 
@@ -220,7 +287,8 @@ def mandato_provvisorio(testo: str, asta, creati: dict):
 
 def salva(righe: list[dict], asta) -> dict:
     """Carica tutto ciò che si può; restituisce il riepilogo di cosa va controllato."""
-    esito = {"caricati": 0, "da_verificare": [], "non_caricati": [], "mandanti_creati": {}}
+    esito = {"caricati": 0, "da_verificare": [], "non_caricati": [], "mandanti_creati": {},
+             "collegati": sum(1 for r in righe if r.get("oggetto_id") and not r["escluso"] and not bloccante(r))}
     creati = {}
     for r in righe:
         if r["escluso"]:
@@ -244,6 +312,7 @@ def salva(righe: list[dict], asta) -> dict:
             asta=asta, numero=r["numero"], tornata=r["tornata"] or 1, sezione=r["sezione"][:150],
             titolo=r["titolo"][:250], illustratore=r["illustratore"][:200], descrizione=r["descrizione"],
             note_interne=note[:250], da_fotografare=r["da_fotografare"], mandato_id=mandato_id,
+            oggetto_id=r.get("oggetto_id") if mandato_id == r["mandato_id"] else None,
             **{k: (Decimal(v) if v is not None else None) for k, v in r["valori"].items()})
         esito["caricati"] += 1
     return esito

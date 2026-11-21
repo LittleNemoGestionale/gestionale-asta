@@ -251,14 +251,22 @@ def importa_lotti(request, asta_id):
         for t in range(2, asta.numero_tornate + 1):
             v = request.POST.get(f"tornata_{t}")
             tornate[t] = int(v) if v and v.isdigit() else None
+        scelte = {int(k): v for k, v in dati.get("oggetti", {}).items()}
+        for i in range(len(dati["righe"])):
+            v = request.POST.get(f"oggetto_{i}")
+            if v is not None and v != str(dati["righe"][i].get("oggetto_id") or ""):  # cambiato a mano
+                scelte[i] = v
         dati["abbinamenti"], dati["tornate"] = abbinamenti, {str(k): v for k, v in tornate.items()}
-        dati["righe"] = imp.controlla(dati["righe"], asta, abbinamenti, {1: 1, **tornate} if any(tornate.values()) else None)
+        dati["oggetti"] = {str(k): v for k, v in scelte.items()}
+        dati["righe"] = imp.controlla(dati["righe"], asta, abbinamenti, {1: 1, **tornate} if any(tornate.values()) else None,
+                                      scelte)
         request.session[chiave] = json.dumps(dati)
         if request.POST.get("azione") == "conferma":
             with transaction.atomic():
                 esito = imp.salva(dati["righe"], asta)
             request.session.pop(chiave, None)
-            messages.success(request, f"{esito['caricati']} lotti caricati.")
+            messages.success(request, f"{esito['caricati']} lotti caricati"
+                             + (f", {esito['collegati']} collegati agli oggetti dei mandati." if esito["collegati"] else "."))
             if esito["mandanti_creati"]:
                 elenco = ", ".join(f"{k} ({v} lotti)" for k, v in sorted(esito["mandanti_creati"].items()))
                 messages.info(request, "Mandanti non trovati in anagrafica: ho creato le schede da completare "
@@ -286,6 +294,8 @@ def importa_lotti(request, asta_id):
             "n_avvisi": sum(1 for r in righe if not r["escluso"] and r["errori"] and not imp.bloccante(r)),
             "n_esclusi": sum(1 for r in righe if r["escluso"]),
             "n_foto": sum(1 for r in righe if r["da_fotografare"] and not r["escluso"]),
+            "n_collegati": sum(1 for r in righe if r.get("oggetto_id") and not r["escluso"]),
+            "n_dubbi": sum(1 for r in righe if r.get("oggetto_dubbio") and not r.get("oggetto_id") and not r["escluso"]),
             "da_abbinare": [(i, t, dati["abbinamenti"].get(t), sum(1 for r in righe if r["mandante_testo"] == t and not r["escluso"]))
                             for i, t in enumerate(da_abbinare)],
             "mandati": Mandato.objects.select_related("mandante").order_by("mandante__codice", "-data"),

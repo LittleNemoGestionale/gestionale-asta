@@ -952,3 +952,37 @@ class MandatiMagazzinoTest(TestCase):
         self.assertEqual(m.oggetti.get(descrizione="Tavola 2").stima_min, D("1500"))
         nuovo = next(x for x in Soggetto.objects.filter(is_mandante=True) if x.nome == "Nuovo Collezionista")
         self.assertEqual(nuovo.mandati.get().oggetti.get().descrizione, "Manifesto")
+
+
+class CollegaOggettiTest(TestCase):
+    def setUp(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        self.asta = Asta.objects.create(numero=91, nome="Locandine", data=date(2099, 1, 1))
+        bruni = Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        alfa = Soggetto.objects.create(tipo="azienda", ragione_sociale="Libreria Alfa srl", is_mandante=True)
+        self.m_b = Mandato.objects.create(mandante=bruni, numero="4017", data=date.today(), commissione_pct=15)
+        self.m_a = Mandato.objects.create(mandante=alfa, numero="4009", data=date.today(), commissione_pct=10)
+        self.cyclops = Oggetto.objects.create(mandato=self.m_a, descrizione="Dr. Cyclops, fotobusta USA")
+        self.astronave = Oggetto.objects.create(mandato=self.m_b, descrizione="L'Astronave Atomica del Dr. Quatermass, manifesto")
+        self.altro = Oggetto.objects.create(mandato=self.m_b, descrizione="Topolino libretto n. 1")
+
+    def test_word_collega_lotti_e_oggetti(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        url = f"/asta/{self.asta.pk}/lotti/importa/"
+        r = self.client.post(url, {"file": SimpleUploadedFile("Schede.docx", _catalogo_word())})
+        righe = {x["numero"]: x for x in r.context["righe"]}
+        self.assertEqual((righe["1"]["oggetto_id"], righe["2"]["oggetto_id"]), (self.cyclops.pk, self.astronave.pk))
+        self.client.post(url, {"azione": "conferma"})
+        lotti = {l.numero: l for l in self.asta.lotti.all()}
+        self.assertEqual((lotti["1"].oggetto, lotti["2"].oggetto), (self.cyclops, self.astronave))
+        self.assertEqual(Oggetto.objects.get(pk=self.cyclops.pk).stato, "assegnato")
+        self.assertEqual(Oggetto.objects.get(pk=self.altro.pk).stato, "magazzino")
+
+    def test_scelta_a_mano(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        url = f"/asta/{self.asta.pk}/lotti/importa/"
+        r = self.client.post(url, {"file": SimpleUploadedFile("Schede.docx", _catalogo_word())})
+        i = next(n for n, x in enumerate(r.context["righe"]) if x["numero"] == "2")
+        self.client.post(url, {"azione": "conferma", f"oggetto_{i}": ""})  # «nessuno»
+        self.assertIsNone(self.asta.lotti.get(numero="2").oggetto)

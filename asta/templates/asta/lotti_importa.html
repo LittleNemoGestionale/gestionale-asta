@@ -36,6 +36,7 @@
 <p>File <b>{{ dati.file }}</b> ·
   <b>{{ n_ok|add:n_avvisi }}</b> lotti da caricare{% if n_avvisi %} (di cui <span class="warn">{{ n_avvisi }} con mandante da abbinare</span>: si caricano lo stesso e restano segnati «da verificare»){% endif %}{% if n_err %} · <span class="warn">{{ n_err }} non caricabili</span> (numero doppio o riga vuota){% endif %}{% if n_esclusi %} · <span class="muted">{{ n_esclusi }} esclusi (sezioni «da inserire / prossime aste»)</span>{% endif %}{% if n_foto %} · <span class="foto">{{ n_foto }} da fotografare</span>{% endif %}
   · <a href="?nuovo=1">carica un altro file</a></p>
+{% if n_collegati or n_dubbi %}<p>Oggetti dei mandati: <b>{{ n_collegati }}</b> lotti collegati al loro oggetto{% if n_dubbi %} · <span class="warn">{{ n_dubbi }} da confermare</span> (scegli l'oggetto nella colonna «Oggetto» e premi «Aggiorna l'anteprima»){% endif %}.</p>{% endif %}
 
 <form method="post">{% csrf_token %}
   {% if da_abbinare %}
@@ -66,16 +67,20 @@
 
   <h2>Anteprima</h2>
   <div class="scroll"><table>
-    <thead><tr><th>Lotto</th>{% if tornate %}<th>Torn.</th>{% endif %}<th>Titolo e descrizione</th><th>Mandante</th><th class="n">Base</th><th class="n">Stima</th><th class="n">Riserva</th><th>Esito</th></tr></thead>
+    <thead><tr><th>Lotto</th>{% if tornate %}<th>Torn.</th>{% endif %}<th>Titolo e descrizione</th><th>Mandante</th><th class="n">Base</th><th class="n">Stima</th><th class="n">Riserva</th><th>Oggetto</th><th>Esito</th></tr></thead>
     <tbody>
     {% for r in righe %}
-      {% ifchanged r.sezione %}{% if r.sezione %}<tr class="sez"><td colspan="8">{{ r.sezione }}</td></tr>{% endif %}{% endifchanged %}
+      {% ifchanged r.sezione %}{% if r.sezione %}<tr class="sez"><td colspan="9">{{ r.sezione }}</td></tr>{% endif %}{% endifchanged %}
       <tr class="{% if r.escluso %}escluso{% elif r.errori %}mid{% else %}ok{% endif %}">
         <td><b>{{ r.numero|default:"—" }}</b></td>{% if tornate %}<td>{{ r.tornata|default:1 }}</td>{% endif %}
         <td><div class="tit">{{ r.titolo|default:"" }}</div><div class="desc">{{ r.descrizione|truncatechars:140 }}</div>
           {% if r.note_interne %}<div class="desc"><i>Nota: {{ r.note_interne }}</i></div>{% endif %}</td>
         <td>{% if r.mandato %}{{ r.mandato }}{% else %}<span class="warn">{{ r.mandante_testo|default:"—" }}</span>{% endif %}</td>
         <td class="n">{{ r.valori.base_asta|euro }}</td><td class="n">{{ r.valori.stima_max|euro }}</td><td class="n">{{ r.valori.riserva|euro }}</td>
+        <td>{% if r.oggetto_candidati and not r.escluso %}<select name="oggetto_{{ forloop.counter0 }}" style="max-width:190px{% if r.oggetto_dubbio and not r.oggetto_id %};border:2px solid #b00020{% endif %}">
+            <option value="">{% if r.oggetto_dubbio and not r.oggetto_id %}da confermare…{% else %}nessuno{% endif %}</option>
+            {% for id, etichetta in r.oggetto_candidati %}<option value="{{ id }}" {% if r.oggetto_id == id %}selected{% endif %}>{{ etichetta }}</option>{% endfor %}</select>
+          {% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if r.escluso %}escluso{% elif r.errori %}<span class="warn">{{ r.errori|join:"; " }}</span>{% else %}<span class="pill ok">ok</span>{% endif %}
           {% if r.avvisi and not r.escluso %}<br><span class="muted">{{ r.avvisi|join:"; " }}</span>{% endif %}
           {% if r.da_fotografare and not r.escluso %}<br><span class="foto">da fotografare</span>{% endif %}</td>
