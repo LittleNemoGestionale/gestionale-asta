@@ -1,0 +1,24 @@
+{% extends "asta/base.html" %}
+{% block title %}Nuovo mandato{% endblock %}
+{% block doc %}
+<p><a href="{% if s and not mandanti %}{% url 'scheda' s.pk %}{% else %}{% url 'mandati' %}{% endif %}">← indietro</a></p>
+<h1>Nuovo mandato{% if s and not mandanti %} · {{ s.nome }}{% endif %}</h1>
+<p class="muted">Il mandato è il materiale affidato da un mandante: qui segnate la commissione concordata, lo stato del materiale, la destinazione e l'elenco degli oggetti (si possono aggiungere anche dopo).</p>
+{% if errori %}<div class="msg error">{{ errori|join:" · " }}</div>{% endif %}
+<form method="post">{% csrf_token %}
+  <div class="campi box" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 16px">
+    {% if mandanti or not s %}<div style="grid-column:1/-1"><label>Mandante</label>
+      <select name="mandante" required style="width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px"><option value="">— scegli —</option>
+        {% for x in mandanti %}<option value="{{ x.pk }}" {% if s and s.pk == x.pk %}selected{% endif %}>{{ x.nome }} ({{ x.codice }})</option>{% endfor %}</select>
+      <div class="muted" style="font-size:12px">Non c'è? <a href="{% url 'scheda_nuova' %}?ruolo=mandante" target="_blank">Crea la scheda</a> (si apre in un'altra finestra), poi ricarica questa pagina.</div></div>{% endif %}
+    {% for f in form %}<div {% if f.name == 'note_accordo' %}style="grid-column:1/-1"{% endif %}>
+      {% if f.field.widget.input_type == 'checkbox' %}<label>{{ f }} {{ f.label }}</label>{% else %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% endif %}{{ f.errors }}</div>{% endfor %}
+  </div>
+  <h2>Oggetti del mandato</h2>
+  {% include "asta/_righe_oggetti.html" %}
+  <div class="azioni"><button class="btn">Registra mandato</button></div>
+</form>
+<style>.campi label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px}
+.campi input:not([type=checkbox]),.campi select,.campi textarea{width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff}
+table.righe input{width:100%;font:inherit;padding:5px 7px;border:1px solid var(--line);border-radius:5px}</style>
+{% endblock %}

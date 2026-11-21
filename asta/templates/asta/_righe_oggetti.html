@@ -1,0 +1,14 @@
+<div class="scroll"><table class="righe" id="tab-righe">
+  <thead><tr><th style="min-width:260px">Descrizione *</th><th>Categoria</th><th>Stima min €</th><th>Stima max €</th><th>Riserva €</th><th>Note</th></tr></thead>
+  <tbody>{% for i in righe_vuote %}<tr>
+    <td><input name="r_descrizione"></td><td><input name="r_categoria" list="dl-categorie-r"></td>
+    <td><input name="r_stima_min" inputmode="decimal"></td><td><input name="r_stima_max" inputmode="decimal"></td>
+    <td><input name="r_riserva" inputmode="decimal"></td><td><input name="r_note"></td></tr>{% endfor %}</tbody>
+</table></div>
+<button type="button" class="btn sec" onclick="const t=document.querySelector('#tab-righe tbody'); const r=t.rows[0].cloneNode(true); r.querySelectorAll('input').forEach(i=>i.value=''); t.appendChild(r)">+ Altra riga</button>
+<details style="margin-top:10px"><summary>Incolla più righe insieme (da Excel o da un elenco)</summary>
+  <p class="muted">Una riga per oggetto, campi separati da tabulazione (copia da Excel), punto e virgola o barra verticale:
+    <code>Descrizione ; Categoria ; Stima min ; Stima max ; Riserva ; Note</code></p>
+  <textarea name="incolla" rows="5" style="width:100%;font:inherit" placeholder="Tavola originale a china, pag. 12; Tavola originale; 800; 1200; 700">{{ incolla }}</textarea>
+</details>
+<datalist id="dl-categorie-r">{% for c in categorie %}<option value="{{ c }}">{% endfor %}</datalist>

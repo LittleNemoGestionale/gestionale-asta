@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import (Aggiudicazione, Asta, Incasso, Indirizzo, Lotto, Mandato, MetodoPagamento,
+from .models import (Aggiudicazione, Asta, Incasso, Indirizzo, Lotto, Mandato, MetodoPagamento, Oggetto,
                      PagamentoMandante, Paletta, Soggetto, SpesaMandante)
 
 admin.site.site_header = "Gestionale Asta"
@@ -64,6 +64,14 @@ class PalettaInline(admin.TabularInline):
     extra = 0
     autocomplete_fields = ["acquirente"]
     fields = ["numero", "acquirente", "indirizzo_spedizione", "spese_spedizione"]
+
+
+@admin.register(Oggetto)
+class OggettoAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "categoria", "destinazione", "collocazione", "consegnato_il", "restituito_il")
+    list_filter = ("destinazione", "categoria")
+    search_fields = ("descrizione", "mandato__numero")
+    raw_id_fields = ("mandato",)
 
 
 @admin.register(Asta)

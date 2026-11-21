@@ -137,6 +137,19 @@ class Indirizzo(models.Model):
 class Mandato(models.Model):
     """Accordo con il mandante: qui si fissa la commissione concordata."""
 
+    class Arrivo(models.TextChoices):
+        SPEDITI = "spediti", "In arrivo (spediti)"
+        NON_SPEDITI = "non_spediti", "In arrivo (non spediti)"
+        DA_RITIRARE = "da_ritirare", "Da ritirare"
+        IN_SEDE = "in_sede", "In sede"
+
+    class Destinazione(models.TextChoices):
+        CONTOVENDITA = "contovendita", "Contovendita"
+        PROSSIMA_ASTA = "prossima_asta", "Prossima asta"
+        ASTA_FUTURA = "asta_futura", "Asta futura"
+        CATAWIKI = "catawiki", "Catawiki"
+        CONSEGNE = "consegne", "Consegne"
+
     mandante = models.ForeignKey(Soggetto, on_delete=models.PROTECT, related_name="mandati")
     numero = models.CharField(max_length=20, unique=True)
     data = models.DateField()
@@ -146,12 +159,93 @@ class Mandato(models.Model):
         "spese inserimento per lotto €", max_digits=8, decimal_places=2, default=Decimal("10.00"),
         help_text="addebitate per ogni lotto messo in catalogo, venduto o no")
     note_accordo = models.TextField(blank=True)
+    stato_arrivo = models.CharField("stato del materiale", max_length=15, choices=Arrivo.choices, blank=True)
+    destinazione = models.CharField(max_length=15, choices=Destinazione.choices, blank=True,
+                                    help_text="vale per tutti gli oggetti, salvo quelli con una destinazione propria")
 
     class Meta:
         verbose_name_plural = "mandati"
 
     def __str__(self):
         return f"Mandato {self.numero} ({self.mandante.codice}, {self.commissione_pct}%)"
+
+
+class Oggetto(models.Model):
+    """Pezzo ricevuto con un mandato, prima e dopo il passaggio in asta (il magazzino)."""
+
+    class Stato(models.TextChoices):
+        MAGAZZINO = "magazzino", "In magazzino"
+        ASSEGNATO = "assegnato", "Assegnato a un'asta"
+        VENDUTO = "venduto", "Venduto"
+        INVENDUTO = "invenduto", "Invenduto"
+        RESTITUITO = "restituito", "Restituito"
+
+    mandato = models.ForeignKey(Mandato, on_delete=models.PROTECT, related_name="oggetti")
+    progressivo = models.PositiveIntegerField(editable=False)
+    descrizione = models.TextField()
+    categoria = models.CharField(max_length=80, blank=True)
+    stima_min = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    stima_max = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    riserva = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    collocazione = models.CharField(max_length=100, blank=True, help_text="dove si trova, es. Caveau, Scatole bianche")
+    destinazione = models.CharField(max_length=15, choices=Mandato.Destinazione.choices, blank=True,
+                                    help_text="vuoto = quella del mandato")
+    consegnato_il = models.DateField(null=True, blank=True)
+    restituito_il = models.DateField(null=True, blank=True)
+    note = models.CharField(max_length=250, blank=True)
+    creato = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name_plural = "oggetti"
+        ordering = ["mandato", "progressivo"]
+        constraints = [models.UniqueConstraint(fields=["mandato", "progressivo"], name="oggetto_unico_per_mandato")]
+
+    def save(self, *args, **kwargs):
+        if not self.progressivo:
+            ultimo = Oggetto.objects.filter(mandato=self.mandato).aggregate(m=models.Max("progressivo"))["m"]
+            self.progressivo = (ultimo or 0) + 1
+        super().save(*args, **kwargs)
+
+    @property
+    def codice(self) -> str:
+        return f"{self.mandato.numero}/{self.progressivo:02d}"
+
+    @property
+    def destinazione_effettiva(self) -> str:
+        return self.destinazione or self.mandato.destinazione
+
+    def get_destinazione_effettiva_display(self) -> str:
+        return dict(Mandato.Destinazione.choices).get(self.destinazione_effettiva, "")
+
+    @property
+    def ultimo_lotto(self):
+        lotti = getattr(self, "_lotti", None)
+        if lotti is None:
+            lotti = list(self.lotti.select_related("asta", "aggiudicazione").order_by("asta__data", "pk"))
+        return lotti[-1] if lotti else None
+
+    @property
+    def stato(self) -> str:
+        if self.restituito_il:
+            return self.Stato.RESTITUITO
+        l = self.ultimo_lotto
+        if l is None:
+            return self.Stato.MAGAZZINO
+        if hasattr(l, "aggiudicazione"):
+            return self.Stato.VENDUTO
+        if l.asta.chiusa or l.stato in (Lotto.Stato.INVENDUTO, Lotto.Stato.DA_RENDERE, Lotto.Stato.RIPROPOSTO):
+            return self.Stato.INVENDUTO
+        return self.Stato.ASSEGNATO
+
+    def get_stato_display(self) -> str:
+        return dict(self.Stato.choices)[self.stato]
+
+    @property
+    def disponibile(self) -> bool:
+        return self.stato in (self.Stato.MAGAZZINO, self.Stato.INVENDUTO)
+
+    def __str__(self):
+        return f"{self.codice} {self.descrizione[:40]}"
 
 
 # ---------------------------------------------------------------- asta
@@ -443,6 +537,8 @@ class Lotto(models.Model):
                                       related_name="riproposte", help_text="se riproposto da un'asta precedente")
     ordine = models.PositiveIntegerField(default=0, editable=False, db_index=True)
     data_reso = models.DateField(null=True, blank=True)
+    oggetto = models.ForeignKey("Oggetto", on_delete=models.SET_NULL, null=True, blank=True, related_name="lotti",
+                                help_text="il pezzo del magazzino messo in asta con questo lotto")
 
     class Meta:
         verbose_name_plural = "lotti"

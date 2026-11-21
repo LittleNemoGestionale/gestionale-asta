@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .crypto import blind_index
-from .models import Aggiudicazione, Asta, Indirizzo, Interesse, Lotto, Mandato, Paletta, Soggetto
+from .models import Aggiudicazione, Asta, Indirizzo, Interesse, Lotto, Paletta, Soggetto
 
 pii = permission_required("asta.view_dati_personali", raise_exception=True)
 
@@ -172,34 +172,6 @@ def scheda(request, soggetto_id=None):
     return render(request, "asta/scheda.html", {
         "s": s, "form": form, "dom": dom, "sped": sped, "diversa": diversa, "puo": puo,
         "ritorno": ritorno, **storico})
-
-
-class MandatoForm(forms.ModelForm):
-    class Meta:
-        model = Mandato
-        fields = ["numero", "data", "commissione_pct", "spesa_inserimento", "iva_su_commissione", "note_accordo"]
-        widgets = {"data": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
-                   "note_accordo": forms.Textarea(attrs={"rows": 2})}
-
-
-@login_required
-@permission_required("asta.add_mandato", raise_exception=True)
-def nuovo_mandato(request, soggetto_id):
-    s = get_object_or_404(Soggetto, pk=soggetto_id)
-    anno = timezone.localdate().year
-    n = Mandato.objects.filter(numero__startswith=f"{anno}/").count() + 1
-    form = MandatoForm(request.POST or None, initial={"numero": f"{anno}/{n:03d}", "data": timezone.localdate(),
-                                                      "commissione_pct": 15})
-    if request.method == "POST" and form.is_valid():
-        m = form.save(commit=False)
-        m.mandante = s
-        m.save()
-        if not s.is_mandante:
-            s.is_mandante = True
-            s.save()
-        messages.success(request, f"Mandato {m.numero} creato ({m.commissione_pct}%).")
-        return redirect("scheda", s.pk)
-    return render(request, "asta/mandato_form.html", {"s": s, "form": form})
 
 
 # ------------------------------------------------------------------ palette

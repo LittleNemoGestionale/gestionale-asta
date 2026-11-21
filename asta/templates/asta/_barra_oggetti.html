@@ -1,0 +1,23 @@
+{# barra delle azioni sugli oggetti spuntati; va dentro un <form method="post"> #}
+{% if perms.asta.change_mandato %}
+<div class="box barra-ogg">
+  <b>Con gli oggetti spuntati:</b>
+  <div class="riga">
+    <input name="b_categoria" list="dl-categorie" placeholder="Categoria (scegli o scrivi)" autocomplete="off">
+    <select name="b_destinazione"><option value="">Destinazione: non cambiare</option>
+      {% for v, l in destinazioni %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+      <option value="-">Come il mandato (togli quella propria)</option></select>
+    <input name="b_collocazione" list="dl-collocazioni" placeholder="Collocazione, es. Caveau" autocomplete="off">
+    <button class="btn" name="azione" value="applica">Applica</button>
+  </div>
+  <div class="riga">
+    <select name="asta"><option value="">— asta —</option>{% for a in aste_aperte %}<option value="{{ a.pk }}">Asta {{ a.numero|default:a.nome }} · {{ a.data|date:"d/m/Y" }}</option>{% endfor %}</select>
+    <button class="btn sec" name="azione" value="assegna">Assegna all'asta</button>
+    <span class="sp"></span>
+    {% block extra %}<button class="btn sec" name="azione" value="restituisci" onclick="return confirm('Segnare gli oggetti spuntati come restituiti al mandante?')">Restituiti al mandante</button>{% endblock %}
+  </div>
+  <span class="muted" style="font-size:12px">Un campo lasciato vuoto non cambia nulla. Con «Consegne» gli oggetti finiscono nella <a href="{% url 'consegne' %}">lista delle consegne</a>.</span>
+</div>
+<datalist id="dl-categorie">{% for c in categorie %}<option value="{{ c }}">{% endfor %}</datalist>
+<datalist id="dl-collocazioni">{% for c in collocazioni %}<option value="{{ c }}">{% endfor %}</datalist>
+{% endif %}

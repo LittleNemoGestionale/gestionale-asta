@@ -1,0 +1,34 @@
+{% extends "asta/base.html" %}
+{% block title %}Mandato {{ m.numero }}{% endblock %}
+{% block doc %}
+{% for x in messages %}<div class="msg {{ x.tags }}">{{ x }}</div>{% endfor %}
+<p><a href="{% url 'mandati' %}">← Mandati</a></p>
+<h1>Mandato {{ m.numero }} · {% if perms.asta.view_dati_personali %}<a href="{% url 'scheda' m.mandante_id %}">{{ m.mandante.nome }}</a>{% else %}mandante {{ m.mandante.codice }}{% endif %}</h1>
+<p class="muted">Ricevuto il {{ m.data|date:"d/m/Y" }} · commissione {{ m.commissione_pct|floatformat:0 }}% · {{ oggetti|length }} oggetti
+  {% if m.stato_arrivo %}· <b>{{ m.get_stato_arrivo_display }}</b>{% endif %}{% if m.destinazione %} · destinazione <b>{{ m.get_destinazione_display }}</b>{% endif %}</p>
+{% if "DA VERIFICARE" in m.note_accordo %}<div class="msg info">{{ m.note_accordo }}</div>{% endif %}
+
+{% if perms.asta.change_mandato %}
+<details class="box" {% if form.errors %}open{% endif %}><summary><b>Modifica dati del mandato</b> (stato del materiale, destinazione, commissione…)</summary>
+  <form method="post" class="campi" style="margin-top:10px">{% csrf_token %}
+    {% for f in form %}<div class="{% if f.name == 'note_accordo' %}largo{% endif %}">
+      {% if f.field.widget.input_type == 'checkbox' %}<label>{{ f }} {{ f.label }}</label>{% else %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% endif %}{{ f.errors }}</div>{% endfor %}
+    <div class="largo"><button class="btn" name="azione" value="salva_mandato">Salva</button></div>
+  </form></details>
+{% endif %}
+
+<h2 id="oggetti">Oggetti</h2>
+<form method="post">{% csrf_token %}
+  {% include "asta/_barra_oggetti.html" %}
+  {% include "asta/_tabella_oggetti.html" %}
+</form>
+
+{% if perms.asta.change_mandato %}
+<h2>Aggiungi oggetti</h2>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
+  {% include "asta/_righe_oggetti.html" %}
+  <p>Oppure da un file Excel (colonne Descrizione, Categoria, Stima min, Stima max, Riserva, Note): <input type="file" name="file" accept=".xlsx"></p>
+  <div class="azioni"><button class="btn" name="azione" value="aggiungi">Aggiungi al mandato</button></div>
+</form>
+{% endif %}
+{% endblock %}

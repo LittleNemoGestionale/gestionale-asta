@@ -1,0 +1,28 @@
+{% load euro %}
+<div class="scroll"><table class="ogg">
+  <thead><tr>{% if perms.asta.change_mandato %}<th><input type="checkbox" onclick="for (const c of this.closest('table').querySelectorAll('input[name=sel]')) c.checked=this.checked" title="Seleziona tutti"></th>{% endif %}
+    <th>Codice</th><th>Descrizione</th>{% if con_mandante %}<th>Mandante</th>{% endif %}<th>Categoria</th><th class="n">Stima</th><th class="n">Riserva</th><th>Destinazione</th><th>Collocazione</th><th>Stato</th></tr></thead>
+  <tbody>
+  {% for o in oggetti %}
+    <tr>{% if perms.asta.change_mandato %}<td><input type="checkbox" name="sel" value="{{ o.pk }}"></td>{% endif %}
+      <td class="code"><a href="{% url 'mandato' o.mandato_id %}">{{ o.codice }}</a></td>
+      <td>{{ o.descrizione|linebreaksbr }}{% if o.note %}<br><i class="muted" style="font-size:12px">{{ o.note }}</i>{% endif %}</td>
+      {% if con_mandante %}<td>{{ o.mandato.mandante.nome }}</td>{% endif %}
+      <td>{{ o.categoria }}</td>
+      <td class="n">{{ o.stima_min|euro }}{% if o.stima_max %} – {{ o.stima_max|euro }}{% endif %}</td>
+      <td class="n">{{ o.riserva|euro }}</td>
+      <td>{{ o.get_destinazione_effettiva_display|default:"—" }}{% if not o.destinazione and o.mandato.destinazione %} <span class="muted" style="font-size:11px">(dal mandato)</span>{% endif %}{% if o.consegnato_il %}<br><span class="muted" style="font-size:11px">consegnato il {{ o.consegnato_il|date:"d/m/Y" }}</span>{% endif %}</td>
+      <td>{{ o.collocazione|default:"—" }}</td>
+      <td><span class="pill {% if o.stato == 'venduto' %}ok{% elif o.stato == 'assegnato' %}mid{% elif o.stato == 'restituito' %}no{% endif %}">{{ o.get_stato_display }}</span>
+        {% with l=o.ultimo_lotto %}{% if l %}<br><a class="muted" style="font-size:12px" href="{% url 'lotti_asta' l.asta_id %}">asta {{ l.asta.numero|default:l.asta.nome }} · lotto {{ l.numero }}</a>{% endif %}{% endwith %}</td>
+    </tr>
+  {% empty %}<tr><td colspan="10" class="muted">Nessun oggetto.</td></tr>{% endfor %}
+  </tbody></table></div>
+<style>
+  .barra-ogg { display:grid; gap:8px; margin:10px 0 } .barra-ogg .riga { display:flex; gap:8px; flex-wrap:wrap; align-items:center }
+  .barra-ogg input, .barra-ogg select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff }
+  .barra-ogg .sp { flex:1 } td.code { font-family:ui-monospace,Consolas,monospace; font-size:12px; white-space:nowrap }
+  .filtri { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 }
+  .filtri input, .filtri select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff }
+  table.righe input { width:100%; font:inherit; padding:5px 7px; border:1px solid var(--line); border-radius:5px }
+</style>

@@ -6,7 +6,7 @@ from django.core.management import call_command
 from django.db import IntegrityError, connection
 from django.test import TestCase
 
-from .models import Aggiudicazione, Asta, Lotto, Mandato, Paletta, Soggetto, rendiconto_mandante
+from .models import Aggiudicazione, Asta, Lotto, Mandato, Oggetto, Paletta, Soggetto, rendiconto_mandante
 from .views_sala import parse_euro
 
 
@@ -879,3 +879,76 @@ class AggiornaAdessoTest(TestCase):
     def test_solo_amministratore(self):
         self.client.force_login(User.objects.create_user("clerk", password="x", is_staff=True))
         self.assertEqual(self.client.get("/aggiorna/").status_code, 302)
+
+
+class MandatiMagazzinoTest(TestCase):
+    def setUp(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        self.bruni = Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        self.asta = Asta.objects.create(numero=94, nome="Fumetti", data=date(2099, 1, 1))
+
+    def test_nuovo_mandato_con_oggetti(self):
+        r = self.client.post("/mandati/nuovo/", {
+            "mandante": self.bruni.pk, "numero": "2099/001", "data": "2099-01-01", "commissione_pct": "15",
+            "spesa_inserimento": "10", "stato_arrivo": "da_ritirare", "destinazione": "prossima_asta",
+            "r_descrizione": ["Tavola originale", "", ""], "r_categoria": ["Tavola originale", "", ""],
+            "r_stima_min": ["800", "", ""], "r_stima_max": ["1.200", "", ""], "r_riserva": ["", "", ""],
+            "r_note": ["", "", ""],
+            "incolla": "Manifesto Dr. Cyclops; Manifesto; 90; 200; 100; da fotografare\nTopolino n. 1\t\t50"})
+        m = Mandato.objects.get(numero="2099/001")
+        self.assertRedirects(r, f"/mandati/{m.pk}/")
+        oggetti = list(m.oggetti.all())
+        self.assertEqual([(o.codice, o.descrizione, o.stima_max) for o in oggetti],
+                         [("2099/001/01", "Tavola originale", D("1200")),
+                          ("2099/001/02", "Manifesto Dr. Cyclops", D("200")),
+                          ("2099/001/03", "Topolino n. 1", None)])
+        self.assertEqual((oggetti[1].riserva, oggetti[1].note, oggetti[2].stima_min), (D("100"), "da fotografare", D("50")))
+        self.assertEqual((oggetti[0].get_destinazione_effettiva_display(), oggetti[0].stato), ("Prossima asta", "magazzino"))
+        r = self.client.get("/mandati/?arrivo=da_ritirare")
+        self.assertContains(r, "2099/001")
+
+    def test_destinazione_consegne_e_asta(self):
+        m = Mandato.objects.create(mandante=self.bruni, numero="2099/002", data=date.today(), commissione_pct=15,
+                                   destinazione="asta_futura")
+        a = Oggetto.objects.create(mandato=m, descrizione="Albo A")
+        b = Oggetto.objects.create(mandato=m, descrizione="Albo B", stima_min=100, riserva=80)
+        url = f"/mandati/{m.pk}/"
+        self.client.post(url, {"azione": "applica", "sel": [a.pk], "b_destinazione": "consegne", "b_categoria": "Fumetto"})
+        a.refresh_from_db()
+        self.assertEqual((a.destinazione, a.collocazione, a.categoria), ("consegne", "Caveau", "Fumetto"))
+        r = self.client.get("/consegne/")
+        self.assertEqual([o.pk for o in r.context["da_fare"]], [a.pk])
+        self.client.post("/consegne/", {"azione": "consegnato", "sel": [a.pk]})
+        r = self.client.get("/consegne/")
+        self.assertEqual(([o.pk for o in r.context["da_fare"]], [o.pk for o in r.context["fatti"]]), ([], [a.pk]))
+        # assegnato all'asta diventa un lotto collegato all'oggetto
+        self.client.post("/magazzino/", {"azione": "assegna", "sel": [b.pk], "asta": self.asta.pk})
+        lotto = self.asta.lotti.get()
+        self.assertEqual((lotto.numero, lotto.oggetto, lotto.riserva, lotto.mandato), ("1", b, D("80"), m))
+        b = Oggetto.objects.get(pk=b.pk)
+        self.assertEqual(b.stato, "assegnato")
+        r = self.client.get("/magazzino/")  # di default solo i disponibili
+        self.assertNotIn(b.pk, [o.pk for o in r.context["oggetti"]])
+        self.asta.chiusa = True
+        self.asta.save()
+        self.assertEqual(Oggetto.objects.get(pk=b.pk).stato, "invenduto")
+
+    def test_import_excel_mandati(self):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from openpyxl import Workbook
+        wb = Workbook(); ws = wb.active
+        ws.append(["Elenco materiale ricevuto"])
+        ws.append(["Mandante", "N° mandato", "Descrizione", "Categoria", "Stima min", "Riserva"])
+        ws.append(["Bruni", "2099/010", "Tavola 1", "Tavola originale", 300, None])
+        ws.append(["Bruni", "2099/010", "Tavola 2", "Tavola originale", "1.500,00", 1000])
+        ws.append(["Nuovo Collezionista", "", "Manifesto", "Manifesto", 50, None])
+        buf = io.BytesIO(); wb.save(buf)
+        self.client.post("/mandati/importa/", {"file": SimpleUploadedFile("m.xlsx", buf.getvalue())})
+        m = Mandato.objects.get(numero="2099/010")
+        self.assertEqual((m.mandante, m.oggetti.count()), (self.bruni, 2))
+        self.assertEqual(m.oggetti.get(descrizione="Tavola 2").stima_min, D("1500"))
+        nuovo = next(x for x in Soggetto.objects.filter(is_mandante=True) if x.nome == "Nuovo Collezionista")
+        self.assertEqual(nuovo.mandati.get().oggetti.get().descrizione, "Manifesto")

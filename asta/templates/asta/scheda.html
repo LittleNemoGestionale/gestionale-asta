@@ -100,7 +100,7 @@
   {% if s.is_mandante %}
   <h2>Come mandante</h2>
   <h3>Mandati</h3>
-  <p>{% for m in mandati %}<b>{{ m.numero }}</b> del {{ m.data|date:"d/m/Y" }} · commissione {{ m.commissione_pct|floatformat:0 }}%{% if m.note_accordo %} <span class="muted">({{ m.note_accordo }})</span>{% endif %}<br>{% empty %}<span class="muted">Nessun mandato.</span><br>{% endfor %}
+  <p>{% for m in mandati %}<a href="{% url 'mandato' m.pk %}"><b>{{ m.numero }}</b></a> del {{ m.data|date:"d/m/Y" }} · commissione {{ m.commissione_pct|floatformat:0 }}%{% if m.note_accordo %} <span class="muted">({{ m.note_accordo }})</span>{% endif %}<br>{% empty %}<span class="muted">Nessun mandato.</span><br>{% endfor %}
     {% if perms.asta.add_mandato %}<a href="{% url 'nuovo_mandato' s.pk %}">+ Nuovo mandato</a>{% endif %}</p>
   <h3>Lotti affidati</h3>
   {% if affidati %}<table><thead><tr><th>Asta</th><th>Lotto</th><th>Descrizione</th><th>Esito</th></tr></thead>

@@ -344,7 +344,7 @@ def riproponi_invenduti(request, asta_id):
                     asta=asta, numero=str(numero), mandato=l.mandato, descrizione=l.descrizione, tornata=1,
                     stima_min=l.stima_min, stima_max=l.stima_max, riserva=l.riserva,
                     base_asta=_euro(request.POST.get(f"base_{l.pk}")) if request.POST.get(f"base_{l.pk}") else l.base_asta,
-                    commissione_pct=l.commissione_pct, lotto_origine=l)
+                    commissione_pct=l.commissione_pct, lotto_origine=l, oggetto=l.oggetto)
                 l.stato = Lotto.Stato.RIPROPOSTO
                 l.save(update_fields=["stato"])
                 numero += 1

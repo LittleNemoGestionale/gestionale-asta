@@ -1,0 +1,21 @@
+{% extends "asta/base.html" %}{% load euro %}
+{% block title %}Oggetti in magazzino{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<div class="azioni" style="justify-content:space-between"><h1 style="margin:0">Oggetti dei mandati</h1>
+  <span><a class="btn sec" href="{% url 'mandati' %}">Mandati</a> <a class="btn sec" href="{% url 'consegne' %}">Consegne</a></span></div>
+<p class="muted">Tutto il materiale ricevuto. Filtrate, spuntate e scegliete categoria, destinazione o collocazione, oppure assegnate gli oggetti a un'asta: diventano lotti.</p>
+<form class="filtri" method="get">
+  <input name="q" value="{{ f.q }}" placeholder="Cerca descrizione, note o n° mandato">
+  <select name="stato" onchange="this.form.submit()"><option value="">Tutti gli stati</option><option value="disponibili" {% if f.stato == 'disponibili' %}selected{% endif %}>Disponibili (magazzino + invenduti)</option>{% for v, l in stati %}<option value="{{ v }}" {% if f.stato == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <select name="dest" onchange="this.form.submit()"><option value="">Tutte le destinazioni</option>{% for v, l in destinazioni %}<option value="{{ v }}" {% if f.dest == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <select name="cat" onchange="this.form.submit()"><option value="">Tutte le categorie</option>{% for c in categorie %}<option {% if f.cat == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+  <select name="coll" onchange="this.form.submit()"><option value="">Tutte le collocazioni</option>{% for c in collocazioni %}<option {% if f.coll == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+  <button class="btn sec">Cerca</button> <a href="?stato=">Mostra tutto</a>
+</form>
+<p><b>{{ totale }}</b> oggetti · stima minima {{ stima|euro }}{% if totale > 500 %} · mostrati i primi 500{% endif %}</p>
+<form method="post">{% csrf_token %}
+  {% include "asta/_barra_oggetti.html" %}
+  {% with con_mandante=perms.asta.view_dati_personali %}{% include "asta/_tabella_oggetti.html" %}{% endwith %}
+</form>
+{% endblock %}

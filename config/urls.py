@@ -1,14 +1,20 @@
 from django.contrib import admin
 from django.urls import path
 
-from asta import views, views_aggiorna, views_acquirenti, views_mandanti, views_anagrafica, views_aste, views_sala
+from asta import views, views_aggiorna, views_mandati, views_acquirenti, views_mandanti, views_anagrafica, views_aste, views_sala
 
 urlpatterns = [
     path("", views_anagrafica.home, name="home"),
     path("anagrafica/", views_anagrafica.anagrafica, name="anagrafica"),
     path("anagrafica/nuova/", views_anagrafica.scheda, name="scheda_nuova"),
     path("anagrafica/<int:soggetto_id>/", views_anagrafica.scheda, name="scheda"),
-    path("anagrafica/<int:soggetto_id>/mandato/", views_anagrafica.nuovo_mandato, name="nuovo_mandato"),
+    path("anagrafica/<int:soggetto_id>/mandato/", views_mandati.mandato_nuovo, name="nuovo_mandato"),
+    path("mandati/", views_mandati.mandati, name="mandati"),
+    path("mandati/nuovo/", views_mandati.mandato_nuovo, name="mandato_nuovo"),
+    path("mandati/importa/", views_mandati.importa_mandati, name="importa_mandati"),
+    path("mandati/<int:mandato_id>/", views_mandati.mandato, name="mandato"),
+    path("magazzino/", views_mandati.magazzino, name="magazzino"),
+    path("consegne/", views_mandati.consegne, name="consegne"),
     path("palette/", views_anagrafica.palette, name="palette"),
     path("aste/", views_aste.elenco_aste, name="aste"),
     path("aste/nuova/", views_aste.asta_form, name="asta_nuova"),

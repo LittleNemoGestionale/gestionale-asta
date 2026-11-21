@@ -1,0 +1,20 @@
+{% extends "asta/base.html" %}
+{% block title %}Consegne{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<div class="azioni" style="justify-content:space-between"><h1 style="margin:0">Consegne</h1>
+  <span><a class="btn sec" href="{% url 'mandati' %}">Mandati</a> <a class="btn sec" href="{% url 'magazzino' %}">Oggetti in magazzino</a></span></div>
+<p class="muted">Qui arrivano gli oggetti con destinazione «Consegne» (scelta sul mandato o sui singoli oggetti). Se non hanno una collocazione viene messa «Caveau».</p>
+<div class="grid" style="margin:12px 0"><div class="box kpi"><b>{{ da_fare|length }}</b>da consegnare{% if coll %} in «{{ coll }}»{% endif %}</div>
+  {% for c, n in per_coll.items %}<a class="box kpi" style="text-decoration:none;color:inherit" href="?coll={% if c != '(senza collocazione)' %}{{ c|urlencode }}{% endif %}"><b>{{ n }}</b>{{ c }}</a>{% endfor %}</div>
+{% if coll %}<p><a href="?">← tutte le collocazioni</a></p>{% endif %}
+<form method="post">{% csrf_token %}
+  {% if perms.asta.change_mandato %}<div class="azioni"><button class="btn" name="azione" value="consegnato">Segna consegnati oggi</button></div>{% endif %}
+  {% with oggetti=da_fare con_mandante=perms.asta.view_dati_personali %}{% include "asta/_tabella_oggetti.html" %}{% endwith %}
+</form>
+<h2>Consegnati</h2>
+<form method="post">{% csrf_token %}
+  {% if perms.asta.change_mandato %}<div class="azioni"><button class="btn sec" name="azione" value="annulla_consegna">Rimetti da consegnare</button></div>{% endif %}
+  {% with oggetti=fatti con_mandante=perms.asta.view_dati_personali %}{% include "asta/_tabella_oggetti.html" %}{% endwith %}
+</form>
+{% endblock %}

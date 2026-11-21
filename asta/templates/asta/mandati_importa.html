@@ -1,0 +1,18 @@
+{% extends "asta/base.html" %}
+{% block title %}Carica mandati da Excel{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<p><a href="{% url 'mandati' %}">← Mandati</a></p>
+<h1>Carica mandati da Excel</h1>
+<div class="box">
+  <p>Un Excel con <b>una riga per oggetto</b>. Colonne riconosciute (l'ordine non conta, la riga dei titoli può essere anche più in basso):</p>
+  <ul>
+    <li><b>Mandante</b> (nome) oppure <b>Codice mandante</b> — chi non è in anagrafica viene creato come scheda da completare;</li>
+    <li><b>N° mandato</b> — le righe con lo stesso numero finiscono nello stesso mandato; se manca, il programma ne crea uno per mandante;</li>
+    <li><b>Data</b> (ricezione), <b>Descrizione</b> (obbligatoria), <b>Categoria</b>, <b>Stima min</b>, <b>Stima max</b>, <b>Riserva</b>, <b>Note</b>.</li>
+  </ul>
+  <p class="muted">I mandati creati hanno commissione 15% e «In sede»: controllate la percentuale nella pagina del mandato.</p>
+  <form method="post" enctype="multipart/form-data" class="azioni">{% csrf_token %}
+    <input type="file" name="file" accept=".xlsx" required> <button class="btn">Carica</button></form>
+</div>
+{% endblock %}
