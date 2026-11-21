@@ -13,7 +13,7 @@
 <h1>Acquirenti · Asta {{ asta.numero }}</h1>
 <p class="muted">Chi ha comprato e quanto deve pagare. Per ogni paletta: il <b>conteggio delle aggiudicazioni</b> in PDF, la <b>consegna</b> (il costo si propone da solo e si può cambiare) e l'<b>email</b> che si apre in Outlook già compilata, con il PDF allegato.</p>
 {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
-{% if manca_iban %}<div class="msg info">Per le email manca l'IBAN della casa d'aste: va indicato in <code>dati/impostazioni.ini</code> (CASA_ASTA_IBAN, CASA_ASTA_EMAIL, CASA_ASTA_FIRMA).</div>{% endif %}
+{% if manca_iban %}<div class="msg info">Per le email manca l'IBAN della casa d'aste: va indicato in <a href="{% url 'impostazioni' %}">Impostazioni</a>.</div>{% endif %}
 
 <div class="azioni" style="justify-content:space-between">
   <div class="filtri azioni" style="margin:0">

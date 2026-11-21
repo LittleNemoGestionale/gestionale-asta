@@ -64,6 +64,7 @@
     {% if perms.asta.view_dati_personali %}<a href="{% url 'acquirenti' asta.pk %}">Acquirenti</a><a href="{% url 'mandanti' asta.pk %}" title="Rendiconti per i mandanti dopo l'asta">Rendiconti</a>{% endif %}
     {% if perms.asta.view_incasso %}<a href="{% url 'incassi' asta.pk %}">Incassi</a>{% endif %}
 {% endif %}
+  {% if user.is_superuser %}<a href="{% url 'impostazioni' %}" style="opacity:.8;font-size:13px">Impostazioni</a>{% endif %}
   {% if user.is_superuser %}<a href="/admin/" style="opacity:.65;font-size:13px" title="Tabelle tecniche, per correzioni">Archivio tecnico</a>{% endif %}
   {% if perms.asta.change_mandato %}<span title="Ultimo backup" style="font-size:12px;opacity:.85{% if 'avvisi' in ultimo_backup or 'mai' in ultimo_backup %};background:#fff;color:#b00020;padding:2px 8px;border-radius:10px;opacity:1{% endif %}">Backup: {{ ultimo_backup }}</span>{% endif %}
 </nav>

@@ -1,0 +1,18 @@
+{% extends "asta/base.html" %}
+{% block title %}Impostazioni{% endblock %}
+{% block doc %}
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<h1>Impostazioni della casa d'aste</h1>
+<p class="muted">Logo e intestazione compaiono su «Aggiudicazioni relative alla Paletta» (acquirenti) e sui rendiconti dei mandanti. Valgono subito, senza riavviare.</p>
+<form method="post" enctype="multipart/form-data" class="campi box" style="grid-template-columns:1fr 1fr">{% csrf_token %}
+  {% for f in form %}{% if f.name != "togli_logo" %}
+  <div class="{% if f.name == 'CASA_ASTA_INTESTAZIONE' or f.name == 'CASA_ASTA_FIRMA' %}largo{% endif %}">
+    <label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}
+    {% if f.help_text %}<div class="aiuto">{{ f.help_text }}</div>{% endif %}{{ f.errors }}
+    {% if f.name == "logo" %}{% if ha_logo %}<div style="margin-top:8px"><img src="{% url 'logo' %}?v={% now 'U' %}" alt="Logo attuale" style="max-height:70px;max-width:260px;border:1px solid var(--line);padding:4px;background:#fff">
+      <label style="text-transform:none;font-size:13px">{{ form.togli_logo }} togli il logo</label></div>{% else %}<div class="aiuto">Nessun logo: sui documenti compare il nome in grassetto.</div>{% endif %}{% endif %}
+    {% if f.name == "anthropic" %}<div class="aiuto">{% if chiave_claude %}Chiave impostata: la lettura delle foto è attiva.{% else %}Nessuna chiave: la lettura delle foto con Claude è spenta.{% endif %}</div>{% endif %}
+  </div>{% endif %}{% endfor %}
+  <div class="largo"><button class="btn">Salva</button></div>
+</form>
+{% endblock %}

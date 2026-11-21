@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 
-from asta import views, views_aggiorna, views_mandati, views_offerte, views_acquirenti, views_mandanti, views_anagrafica, views_aste, views_sala
+from asta import views, views_aggiorna, views_impostazioni, views_mandati, views_offerte, views_acquirenti, views_mandanti, views_anagrafica, views_aste, views_sala
 
 urlpatterns = [
     path("", views_anagrafica.home, name="home"),
@@ -29,6 +29,8 @@ urlpatterns = [
     path("asta/<int:asta_id>/lotti/importa/", views_aste.importa_lotti, name="importa_lotti"),
     path("asta/<int:asta_id>/lotti/riproponi/", views_aste.riproponi_invenduti, name="riproponi"),
     path("lotti/modello-excel/", views_aste.modello_lotti, name="modello_lotti"),
+    path("impostazioni/", views_impostazioni.impostazioni, name="impostazioni"),
+    path("impostazioni/logo.png", views_impostazioni.logo, name="logo"),
     path("aggiorna/", views_aggiorna.aggiorna_programma, name="aggiorna_programma"),
     path("admin/", admin.site.urls),
     path("backup/excel/", views.scarica_backup, name="scarica_backup"),

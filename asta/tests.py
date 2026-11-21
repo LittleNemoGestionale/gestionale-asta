@@ -693,6 +693,7 @@ class ConteggioPdfTest(AcquirentiEmailTest):
     def _testo_pdf(self, dati: bytes) -> str:
         import shutil
         import subprocess
+        import io
         import tempfile
         if not shutil.which("pdftotext"):
             self.skipTest("pdftotext non disponibile")
@@ -1275,3 +1276,34 @@ class MandanteGiaInAnagraficaTest(TestCase):
         verdi = ris["5002"]["mandato"].mandante
         self.assertTrue(ris["5002"]["nuovo"])
         self.assertIn("Possibile doppione", verdi.note)
+
+
+class ImpostazioniTest(TestCase):
+    def test_salva_e_vale_subito(self):
+        import io
+        import tempfile
+        from pathlib import Path
+
+        from django.conf import settings
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.test import override_settings
+        from PIL import Image
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        with tempfile.TemporaryDirectory() as d, override_settings(DATI_DIR=Path(d), CASA_ASTA_LOGO=str(Path(d) / "logo.png")):
+            (Path(d) / "impostazioni.ini").write_text("# commento da tenere\n[gestionale]\nCASA_ASTA_NOME = Vecchio\nALTRO = 1\n")
+            buf = io.BytesIO(); Image.new("RGB", (40, 20), "red").save(buf, "JPEG")
+            r = self.client.post("/impostazioni/", {
+                "CASA_ASTA_NOME": "Casa Prova srl", "CASA_ASTA_INTESTAZIONE": "Via Roma 1 – 10100 Torino\nTel. 011 000000\nSconto 10%",
+                "CASA_ASTA_EMAIL": "", "CASA_ASTA_IBAN": "IT00X000", "CASA_ASTA_INTESTATARIO": "", "CASA_ASTA_FIRMA": "",
+                "logo": SimpleUploadedFile("logo.jpg", buf.getvalue(), "image/jpeg")})
+            self.assertEqual(r.status_code, 302)
+            testo = (Path(d) / "impostazioni.ini").read_text()
+            self.assertIn("# commento da tenere", testo)
+            self.assertIn("ALTRO = 1", testo)
+            self.assertIn("CASA_ASTA_INTESTAZIONE = Via Roma 1 – 10100 Torino | Tel. 011 000000 | Sconto 10%%", testo)
+            self.assertEqual((settings.CASA_ASTA_NOME, settings.CASA_ASTA_IBAN), ("Casa Prova srl", "IT00X000"))
+            self.assertEqual(Image.open(Path(d) / "logo.png").format, "PNG")
+            import configparser
+            cp = configparser.ConfigParser(); cp.optionxform = str; cp.read(Path(d) / "impostazioni.ini")
+            self.assertTrue(cp["gestionale"]["CASA_ASTA_INTESTAZIONE"].endswith("Sconto 10%"))
