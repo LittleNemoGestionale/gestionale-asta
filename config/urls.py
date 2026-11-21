@@ -13,6 +13,7 @@ urlpatterns = [
     path("mandati/nuovo/", views_mandati.mandato_nuovo, name="mandato_nuovo"),
     path("mandati/importa/", views_mandati.importa_mandati, name="importa_mandati"),
     path("mandati/<int:mandato_id>/", views_mandati.mandato, name="mandato"),
+    path("allegati/<int:allegato_id>/", views_mandati.allegato, name="allegato"),
     path("magazzino/", views_mandati.magazzino, name="magazzino"),
     path("consegne/", views_mandati.consegne, name="consegne"),
     path("palette/", views_anagrafica.palette, name="palette"),

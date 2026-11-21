@@ -21,6 +21,15 @@ def _fernet():
     return Fernet(settings.ASTA_FIELD_KEY.encode())
 
 
+def cifra_bytes(dati: bytes) -> bytes:
+    """Per i file allegati (foto dei mandati firmati, documenti): sul disco restano cifrati."""
+    return _fernet().encrypt(dati)
+
+
+def decifra_bytes(dati: bytes) -> bytes:
+    return _fernet().decrypt(dati)
+
+
 def blind_index(value: str) -> str:
     if not value:
         return ""

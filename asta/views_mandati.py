@@ -9,17 +9,33 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .import_lotti import euro, prossimo_numero
 from .import_word import Riconoscitore
-from .models import Asta, Lotto, Mandato, Oggetto, Soggetto
+from .models import Allegato, Asta, Lotto, Mandato, Oggetto, Soggetto
 
 DEST = Mandato.Destinazione
 CATEGORIE = ["Fumetto", "Manifesto", "Tavola originale", "Illustrazione", "Grafica e stampe", "Libro illustrato",
              "Animazione", "Altro"]
 CAMPI_RIGA = ["descrizione", "categoria", "stima_min", "stima_max", "riserva", "note"]
+TIPI_ALLEGATO = ("image/", "application/pdf")
+MAX_ALLEGATO = 25 * 1024 * 1024
+
+
+def salva_allegati(request, mandato) -> list[str]:
+    """Foto/PDF del modulo firmato; restituisce gli errori."""
+    errori = []
+    for f in request.FILES.getlist("foto"):
+        if not (f.content_type or "").startswith(TIPI_ALLEGATO):
+            errori.append(f"«{f.name}»: si possono allegare solo foto o PDF")
+        elif f.size > MAX_ALLEGATO:
+            errori.append(f"«{f.name}»: file troppo grande (massimo 25 MB)")
+        else:
+            Allegato.salva(mandato, f, request.user.get_username())
+    return errori
 
 
 def numero_mandato_nuovo() -> str:
@@ -237,6 +253,8 @@ def mandato_nuovo(request, soggetto_id=None):
                 m.mandante = s
                 m.save()
                 n = crea_oggetti(m, righe)
+                for e in salva_allegati(request, m):
+                    messages.error(request, e)
                 if not s.is_mandante:
                     s.is_mandante = True
                     s.save()
@@ -266,6 +284,18 @@ def mandato(request, mandato_id):
                 form.save()
                 messages.success(request, "Mandato aggiornato.")
                 return redirect("mandato", m.pk)
+        elif azione == "allega":
+            errori = salva_allegati(request, m)
+            for e in errori:
+                messages.error(request, e)
+            if not errori and request.FILES.getlist("foto"):
+                messages.success(request, "Foto allegata al mandato.")
+            return redirect(f"{request.path}#foto")
+        elif azione == "togli_allegato":
+            a = get_object_or_404(Allegato, pk=request.POST.get("allegato"), mandato=m)
+            a.elimina()
+            messages.success(request, f"Tolto «{a.nome}».")
+            return redirect(f"{request.path}#foto")
         elif azione == "aggiungi":
             righe, errori = righe_da_post(request.POST)
             if request.FILES.get("file"):
@@ -285,8 +315,21 @@ def mandato(request, mandato_id):
         elif azione_oggetti(request, m.oggetti.all()):
             return redirect(f"{request.path}#oggetti")
     oggetti = con_lotti(m.oggetti.all())
-    return render(request, "asta/mandato.html", {"m": m, "form": form, "oggetti": oggetti,
-                                                 "righe_vuote": range(3), **ctx_barra()})
+    allegati = list(m.allegati.all())
+    return render(request, "asta/mandato.html", {"m": m, "form": form, "oggetti": oggetti, "allegati": allegati,
+                                                 "foto": [a for a in allegati if a.immagine],
+                                                 "righe_vuote": range(5 if not oggetti else 3), **ctx_barra()})
+
+
+@login_required
+@permission_required("asta.view_mandato", raise_exception=True)
+def allegato(request, allegato_id):
+    """Mostra la foto o il PDF (decifrato al momento, solo a chi ha accesso ai mandati)."""
+    a = get_object_or_404(Allegato, pk=allegato_id)
+    resp = HttpResponse(a.leggi(), content_type=a.tipo)
+    resp["Content-Disposition"] = f'inline; filename="{a.nome}"'
+    resp["Cache-Control"] = "private, no-store"
+    return resp
 
 
 @login_required

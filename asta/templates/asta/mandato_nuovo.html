@@ -1,11 +1,23 @@
 {% extends "asta/base.html" %}
 {% block title %}Nuovo mandato{% endblock %}
+{% block head %}<style>main { max-width:1400px }</style>{% endblock %}
 {% block doc %}
 <p><a href="{% if s and not mandanti %}{% url 'scheda' s.pk %}{% else %}{% url 'mandati' %}{% endif %}">← indietro</a></p>
 <h1>Nuovo mandato{% if s and not mandanti %} · {{ s.nome }}{% endif %}</h1>
 <p class="muted">Il mandato è il materiale affidato da un mandante: qui segnate la commissione concordata, lo stato del materiale, la destinazione e l'elenco degli oggetti (si possono aggiungere anche dopo).</p>
 {% if errori %}<div class="msg error">{{ errori|join:" · " }}</div>{% endif %}
-<form method="post" enctype="multipart/form-data">{% csrf_token %}
+{% include "asta/_visore.html" %}
+<div class="box" style="margin-bottom:14px"><b>Hai il modulo cartaceo?</b> Scegli la foto: compare qui accanto mentre compili, e resta allegata al mandato (cifrata, insieme ai dati del mandante).
+  <div style="margin-top:6px"><input type="file" name="foto" form="form-mandato" id="foto-modulo" accept="image/*,application/pdf" multiple></div></div>
+<div class="con-foto" id="con-foto">
+  <aside class="visore" id="visore" hidden>
+    <div class="comandi"><b style="margin-right:auto">Foto del modulo</b>
+      <button data-v="-" title="Rimpicciolisci">−</button><button data-v="1">Adatta</button><button data-v="+" title="Ingrandisci">+</button><button data-v="r" title="Ruota di 90°">Ruota ↻</button></div>
+    
+    <div class="area"><div style="position:relative"><img alt="Foto del modulo del mandato"></div></div>
+  </aside>
+<div>
+<form method="post" enctype="multipart/form-data" id="form-mandato">{% csrf_token %}
   <div class="campi box" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 16px">
     {% if mandanti or not s %}<div style="grid-column:1/-1"><label>Mandante</label>
       <select name="mandante" required style="width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px"><option value="">— scegli —</option>
@@ -22,6 +34,16 @@
   {% include "asta/_righe_oggetti.html" %}
   <div class="azioni"><button class="btn">Registra mandato</button></div>
 </form>
+</div></div>
+<script>
+  const vis = Visore(document.getElementById("visore"));
+  document.getElementById("foto-modulo").addEventListener("change", e => {
+    const f = [...e.target.files].find(x => x.type.startsWith("image/") && !/hei[cf]/i.test(x.type));
+    document.getElementById("visore").hidden = !f;
+    document.getElementById("con-foto").classList.toggle("attivo", !!f);
+    if (f) vis.mostra(URL.createObjectURL(f));
+  });
+</script>
 <style>.campi label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px}
 .campi input:not([type=checkbox]),.campi select,.campi textarea{width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff}
 table.righe input{width:100%;font:inherit;padding:5px 7px;border:1px solid var(--line);border-radius:5px}</style>

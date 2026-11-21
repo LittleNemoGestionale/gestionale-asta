@@ -45,6 +45,11 @@ class Command(BaseCommand):
                 f.unlink()
             self.stdout.write(f"Database copiato: {tmp.with_suffix('.zip').name}")
 
+        # 2b) Foto e PDF dei mandati (già cifrati)
+        allegati = settings.DATI_DIR / "allegati"
+        if allegati.exists():
+            shutil.copytree(allegati, base / "allegati", dirs_exist_ok=True)
+
         # 3) Copie su disco esterno / NAS / cartella cloud
         ok = True
         for dest in filter(None, (d.strip() for d in os.environ.get("ASTA_BACKUP_COPIE", "").split(";"))):

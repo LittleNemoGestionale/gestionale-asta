@@ -1004,3 +1004,31 @@ class CollegaOggettiTest(TestCase):
         i = next(n for n, x in enumerate(r.context["righe"]) if x["numero"] == "2")
         self.client.post(url, {"azione": "conferma", f"oggetto_{i}": ""})  # «nessuno»
         self.assertIsNone(self.asta.lotti.get(numero="2").oggetto)
+
+
+class AllegatiMandatoTest(TestCase):
+    def setUp(self):
+        call_command("crea_ruoli", verbosity=0)
+        self.client.force_login(User.objects.create_superuser("adm", password="x"))
+        s = Soggetto.objects.create(nome_proprio="Mario", cognome="Bruni", is_mandante=True)
+        self.m = Mandato.objects.create(mandante=s, numero="2099/007", data=date.today(), commissione_pct=15)
+
+    def test_foto_cifrata_e_visibile(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from .models import Allegato
+        png = b"\x89PNG\r\n\x1a\n" + b"0" * 100
+        self.client.post(f"/mandati/{self.m.pk}/", {"azione": "allega",
+                                                   "foto": SimpleUploadedFile("modulo.png", png, "image/png")})
+        a = Allegato.objects.get()
+        self.assertNotIn(b"PNG", (Allegato.cartella() / a.file).read_bytes())  # sul disco è cifrata
+        r = self.client.get(f"/allegati/{a.pk}/")
+        self.assertEqual((r.content, r["Content-Type"]), (png, "image/png"))
+        r = self.client.get(f"/mandati/{self.m.pk}/")
+        self.assertContains(r, 'id="visore"')
+        self.client.post(f"/mandati/{self.m.pk}/", {"azione": "allega",
+                                                   "foto": SimpleUploadedFile("x.exe", b"MZ", "application/x-msdownload")})
+        self.assertEqual(Allegato.objects.count(), 1)
+        self.client.post(f"/mandati/{self.m.pk}/", {"azione": "togli_allegato", "allegato": a.pk})
+        self.assertFalse(Allegato.objects.exists())
+        self.assertFalse((Allegato.cartella() / a.file).exists())

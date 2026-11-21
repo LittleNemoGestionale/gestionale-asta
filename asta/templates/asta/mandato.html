@@ -1,5 +1,6 @@
 {% extends "asta/base.html" %}
 {% block title %}Mandato {{ m.numero }}{% endblock %}
+{% block head %}<style>main { max-width:1400px }</style>{% endblock %}
 {% block doc %}
 {% for x in messages %}<div class="msg {{ x.tags }}">{{ x }}</div>{% endfor %}
 <p><a href="{% url 'mandati' %}">← Mandati</a></p>
@@ -17,6 +18,18 @@
   </form></details>
 {% endif %}
 
+<h2 id="foto">Modulo firmato e documenti</h2>
+{% if allegati %}<div class="allegati">{% for a in allegati %}
+  <div class="allegato">{% if a.immagine %}<a href="{% url 'allegato' a.pk %}" target="_blank"><img src="{% url 'allegato' a.pk %}" alt="{{ a.nome }}"></a>{% else %}<a class="doc" href="{% url 'allegato' a.pk %}" target="_blank">{{ a.nome }}</a>{% endif %}
+    <div class="muted" style="font-size:12px">{{ a.caricato_il|date:"d/m/Y" }}{% if perms.asta.change_mandato %} · <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="allegato" value="{{ a.pk }}"><button class="link" name="azione" value="togli_allegato" onclick="return this.dataset.ok ? true : (this.dataset.ok = 1, this.textContent = 'conferma: togli', false)">togli</button></form>{% endif %}</div></div>
+{% endfor %}</div>{% else %}<p class="muted">Nessuna foto del modulo.</p>{% endif %}
+{% if perms.asta.change_mandato %}<form method="post" enctype="multipart/form-data" class="azioni">{% csrf_token %}
+  <input type="file" name="foto" accept="image/*,application/pdf" multiple required> <button class="btn sec" name="azione" value="allega">Allega</button>
+  <span class="muted" style="font-size:12px">Foto o PDF del mandato firmato, del documento d'identità… Restano cifrati nel computer dell'ufficio.</span></form>{% endif %}
+<style>.allegati{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}.allegato img{width:130px;height:130px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.allegato .doc{display:flex;width:130px;height:130px;align-items:center;justify-content:center;text-align:center;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px;word-break:break-all}
+button.link{border:0;background:none;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline}</style>
+
 <h2 id="oggetti">Oggetti</h2>
 <form method="post">{% csrf_token %}
   {% include "asta/_barra_oggetti.html" %}
@@ -25,11 +38,29 @@
 
 {% if perms.asta.change_mandato %}
 <h2>Aggiungi oggetti</h2>
+{% include "asta/_visore.html" %}
+<div class="con-foto {% if foto %}attivo{% endif %}">
+  {% if foto %}<aside class="visore" id="visore" >
+    <div class="comandi"><b style="margin-right:auto">Foto del modulo</b>
+      <button data-v="-" title="Rimpicciolisci">−</button><button data-v="1">Adatta</button><button data-v="+" title="Ingrandisci">+</button><button data-v="r" title="Ruota di 90°">Ruota ↻</button></div>
+    {% if foto|length > 1 %}<div class="miniature" style="margin-bottom:6px">{% for a in foto %}<button type="button" data-src="{% url 'allegato' a.pk %}" class="{% if forloop.first %}on{% endif %}"><img src="{% url 'allegato' a.pk %}" alt=""></button>{% endfor %}</div>{% endif %}
+    <div class="area"><div style="position:relative"><img alt="Foto del modulo del mandato"></div></div>
+  </aside>{% endif %}
+<div>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}
   {% include "asta/_righe_oggetti.html" %}
   <div class="box" style="margin:12px 0"><b>Oppure da un file Excel:</b> <input type="file" name="file" accept=".xlsx">
     <div class="muted" style="font-size:12px;margin-top:4px">Una riga per oggetto, colonne Descrizione, Categoria, Stima min, Stima max, Riserva, Note.</div></div>
   <div class="azioni"><button class="btn" name="azione" value="aggiungi">Aggiungi al mandato</button></div>
 </form>
+</div></div>
+{% if foto %}<script>
+  const vis = Visore(document.getElementById("visore"));
+  vis.mostra("{% url 'allegato' foto.0.pk %}");
+  document.querySelectorAll(".miniature button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".miniature button").forEach(x => x.classList.toggle("on", x === b));
+    vis.mostra(b.dataset.src);
+  }));
+</script>{% endif %}
 {% endif %}
 {% endblock %}

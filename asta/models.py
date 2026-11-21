@@ -170,6 +170,56 @@ class Mandato(models.Model):
         return f"Mandato {self.numero} ({self.mandante.codice}, {self.commissione_pct}%)"
 
 
+class Allegato(models.Model):
+    """Foto o PDF del mandato firmato (con i dati del mandante): salvato cifrato in dati/allegati."""
+
+    mandato = models.ForeignKey(Mandato, on_delete=models.CASCADE, related_name="allegati")
+    nome = models.CharField(max_length=200)
+    tipo = models.CharField(max_length=100)
+    file = models.CharField(max_length=100, editable=False, help_text="nome del file cifrato in dati/allegati")
+    dimensione = models.PositiveIntegerField(default=0)
+    caricato_il = models.DateTimeField(auto_now_add=True)
+    caricato_da = models.CharField(max_length=150, blank=True)
+
+    class Meta:
+        verbose_name_plural = "allegati"
+        ordering = ["caricato_il"]
+
+    @staticmethod
+    def cartella():
+        from django.conf import settings
+        d = settings.DATI_DIR / "allegati"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    @classmethod
+    def salva(cls, mandato, caricato, utente=""):
+        import uuid
+
+        from .crypto import cifra_bytes
+        contenuto = caricato.read()
+        nome_file = f"{uuid.uuid4().hex}.bin"
+        (cls.cartella() / nome_file).write_bytes(cifra_bytes(contenuto))
+        return cls.objects.create(mandato=mandato, nome=caricato.name[:200],
+                                  tipo=(caricato.content_type or "application/octet-stream")[:100],
+                                  file=nome_file, dimensione=len(contenuto), caricato_da=str(utente)[:150])
+
+    def leggi(self) -> bytes:
+        from .crypto import decifra_bytes
+        return decifra_bytes((self.cartella() / self.file).read_bytes())
+
+    def elimina(self):
+        (self.cartella() / self.file).unlink(missing_ok=True)
+        self.delete()
+
+    @property
+    def immagine(self) -> bool:
+        return self.tipo.startswith("image/") and "heic" not in self.tipo and "heif" not in self.tipo
+
+    def __str__(self):
+        return self.nome
+
+
 class Oggetto(models.Model):
     """Pezzo ricevuto con un mandato, prima e dopo il passaggio in asta (il magazzino)."""
 
